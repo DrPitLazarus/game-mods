@@ -1,0 +1,311 @@
+﻿<Project Sdk="Microsoft.NET.Sdk" InitialTargets="SetupDLLs">
+
+  <PropertyGroup>
+    <TargetFramework>net35</TargetFramework>
+    <!--PluginInfo.PLUGIN_GUID-->
+    <AssemblyName>BuffKit</AssemblyName>
+    <!--PluginInfo.PLUGIN_NAME-->
+    <Product>BuffKit</Product>
+    <!--PluginInfo.PLUGIN_VERSION-->
+    <Version>0.1.0</Version>
+    <AssemblyTitle>Pit's mod for Corpse Party: Blood Drive.</AssemblyTitle>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Configurations>Debug;Release;Release to GameDir;Release to .zip;Setup .DLLs</Configurations>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release to GameDir|AnyCPU'">
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release to .zip|AnyCPU'">
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
+    <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="BepInEx.Core" Version="5.*" />
+    <PackageReference Include="BepInEx.PluginInfoProps" Version="1.1.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework.TrimEnd(`0123456789`))' == 'net'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.*" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Assets Include="$(ProjectDir)\Assets\**\*.*" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <ZipDir>$(ProjectDir)bin\temp\</ZipDir>
+    <PluginPath>BepInEx\plugins\$(SolutionName)\</PluginPath>
+    <BepInExDownload>https://github.com/BepInEx/BepInEx/releases/download/v5.4.22/BepInEx_x64_5.4.22.0.zip</BepInExDownload>
+    <DownloadFileName>BepInEx_x64_5.4.22.0.zip</DownloadFileName>
+    <DataDirName>CorpseParty_BloodDrive_Data</DataDirName>
+  </PropertyGroup>
+
+  <Target Name="SetupDLLs">
+    <Message Text="***** SetupDLLs *****" Importance="high" />
+    <ReadLinesFromFile File="$(ProjectDir)\GamePath.txt">
+      <Output TaskParameter="Lines" PropertyName="GamePath" />
+    </ReadLinesFromFile>
+    <Message Text="Copy assemblies from $(GamePath)\$(DataDirName)\Managed\ to .\lib." Importance="high" />
+    <ItemGroup>
+      <SourceGameDlls Include="$(GamePath)\$(DataDirName)\Managed\*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SourceGameDlls)" DestinationFolder="$(ProjectDir)lib" />
+  </Target>
+
+  <Target Name="StageModDir" AfterTargets="Build">
+    <Message Text="***** StageModDir *****" Importance="high" />
+    <RemoveDir Directories="$(ZipDir)" />
+    <Message Text="Copy $(TargetFileName) to .\bin\temp\$(PluginPath)" Importance="high" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(ZipDir)$(PluginPath)" />
+
+    <DownloadFile SourceUrl="$(BepInExDownload)" DestinationFolder="$(ProjectDir)bin" SkipUnchangedFiles="true" />
+    <Message Text="Extract .\bin\$(DownloadFileName) to .\bin\temp\" Importance="high" />
+    <Unzip SourceFiles="$(ProjectDir)bin\$(DownloadFileName)" DestinationFolder="$(ZipDir)" />
+
+    <DownloadFile
+      SourceUrl="https://github.com/BepInEx/BepInEx.ConfigurationManager/releases/download/v18.4.1/BepInEx.ConfigurationManager_BepInEx5_v18.4.1.zip"
+      DestinationFolder="$(ProjectDir)bin"
+      SkipUnchangedFiles="true" />
+    <Message Text="Extract .\bin\BepInEx.ConfigurationManager_BepInEx5_v18.4.1.zip to .\bin\temp\" Importance="high" />
+    <Unzip SourceFiles="$(ProjectDir)bin\BepInEx.ConfigurationManager_BepInEx5_v18.4.1.zip" DestinationFolder="$(ZipDir)" />
+  </Target>
+
+  <Target Name="CopyToGameDir" AfterTargets="StageModDir" Condition="$(Configuration) == 'Release to GameDir'">
+    <Message Text="***** CopyToGameDir *****" Importance="high" />
+    <ReadLinesFromFile File="$(ProjectDir)\GamePath.txt">
+      <Output TaskParameter="Lines" PropertyName="GamePath" />
+    </ReadLinesFromFile>
+    <ItemGroup>
+      <FilesToCopy Include="$(ZipDir)\**\*.*" />
+    </ItemGroup>
+    <Message Text="Copy files to game folder $(GamePath)\" Importance="high" />
+    <Copy SourceFiles="@(FilesToCopy)" DestinationFolder="$(GamePath)\%(RecursiveDir)\" />
+    <Message Text="Delete .\bin\$(Configuration)\" Importance="high" />
+    <RemoveDir Directories="$(ProjectDir)bin\$(Configuration)\" />
+  </Target>
+
+  <Target Name="CreateZip" AfterTargets="StageModDir" Condition="$(Configuration) == 'Release to .zip'">
+    <Message Text="***** CreateZip *****" Importance="high" />
+    <ZipDirectory SourceDirectory="$(ZipDir)" DestinationFile="$(ProjectDir)bin\CorpsePartyBloodDrive_$(ProjectName)_$(Version).zip" Overwrite="true" />
+    <Message Text="Delete .\bin\$(Configuration)\" Importance="high" />
+    <RemoveDir Directories="$(ProjectDir)bin\$(Configuration)\" />
+  </Target>
+
+  <ItemGroup>
+    <!--Add `Publicize="true"` to make everything public. Thanks to BepInEx.AssemblyPublicizer.MSBuild.-->
+    <Reference Include="Assembly-CSharp" Publicize="true">
+      <HintPath>lib\Assembly-CSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-CSharp-firstpass">
+      <HintPath>lib\Assembly-CSharp-firstpass.dll</HintPath>
+    </Reference>
+    <Reference Include="Assembly-UnityScript-firstpass">
+      <HintPath>lib\Assembly-UnityScript-firstpass.dll</HintPath>
+    </Reference>
+    <Reference Include="Boo.Lang">
+      <HintPath>lib\Boo.Lang.dll</HintPath>
+    </Reference>
+    <Reference Include="GalaxyCSharp">
+      <HintPath>lib\GalaxyCSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="I18N">
+      <HintPath>lib\I18N.dll</HintPath>
+    </Reference>
+    <Reference Include="I18N.CJK">
+      <HintPath>lib\I18N.CJK.dll</HintPath>
+    </Reference>
+    <Reference Include="I18N.MidEast">
+      <HintPath>lib\I18N.MidEast.dll</HintPath>
+    </Reference>
+    <Reference Include="I18N.Other">
+      <HintPath>lib\I18N.Other.dll</HintPath>
+    </Reference>
+    <Reference Include="I18N.West">
+      <HintPath>lib\I18N.West.dll</HintPath>
+    </Reference>
+    <Reference Include="Ionic.Zip.CF">
+      <HintPath>lib\Ionic.Zip.CF.dll</HintPath>
+    </Reference>
+    <Reference Include="Mono.Security">
+      <HintPath>lib\Mono.Security.dll</HintPath>
+    </Reference>
+    <Reference Include="Rewired_Core">
+      <HintPath>lib\Rewired_Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Rewired_Windows_Lib">
+      <HintPath>lib\Rewired_Windows_Lib.dll</HintPath>
+    </Reference>
+    <Reference Include="TextMeshPro-2017.1-1.0.56-Runtime">
+      <HintPath>lib\TextMeshPro-2017.1-1.0.56-Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>lib\UnityEngine.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AccessibilityModule">
+      <HintPath>lib\UnityEngine.AccessibilityModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AIModule">
+      <HintPath>lib\UnityEngine.AIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AnimationModule">
+      <HintPath>lib\UnityEngine.AnimationModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ARModule">
+      <HintPath>lib\UnityEngine.ARModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AssetBundleModule">
+      <HintPath>lib\UnityEngine.AssetBundleModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>lib\UnityEngine.AudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ClothModule">
+      <HintPath>lib\UnityEngine.ClothModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ClusterInputModule">
+      <HintPath>lib\UnityEngine.ClusterInputModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ClusterRendererModule">
+      <HintPath>lib\UnityEngine.ClusterRendererModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>lib\UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CrashReportingModule">
+      <HintPath>lib\UnityEngine.CrashReportingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.DirectorModule">
+      <HintPath>lib\UnityEngine.DirectorModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.GameCenterModule">
+      <HintPath>lib\UnityEngine.GameCenterModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.GridModule">
+      <HintPath>lib\UnityEngine.GridModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>lib\UnityEngine.ImageConversionModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>lib\UnityEngine.IMGUIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.InputModule">
+      <HintPath>lib\UnityEngine.InputModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.JSONSerializeModule">
+      <HintPath>lib\UnityEngine.JSONSerializeModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.Networking">
+      <HintPath>lib\UnityEngine.Networking.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ParticlesLegacyModule">
+      <HintPath>lib\UnityEngine.ParticlesLegacyModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>lib\UnityEngine.ParticleSystemModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.PerformanceReportingModule">
+      <HintPath>lib\UnityEngine.PerformanceReportingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.Physics2DModule">
+      <HintPath>lib\UnityEngine.Physics2DModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.PhysicsModule">
+      <HintPath>lib\UnityEngine.PhysicsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.ScreenCaptureModule">
+      <HintPath>lib\UnityEngine.ScreenCaptureModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.SharedInternalsModule">
+      <HintPath>lib\UnityEngine.SharedInternalsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.SpatialTracking">
+      <HintPath>lib\UnityEngine.SpatialTracking.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.SpriteMaskModule">
+      <HintPath>lib\UnityEngine.SpriteMaskModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.SpriteShapeModule">
+      <HintPath>lib\UnityEngine.SpriteShapeModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.StandardEvents">
+      <HintPath>lib\UnityEngine.StandardEvents.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.StyleSheetsModule">
+      <HintPath>lib\UnityEngine.StyleSheetsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TerrainModule">
+      <HintPath>lib\UnityEngine.TerrainModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TerrainPhysicsModule">
+      <HintPath>lib\UnityEngine.TerrainPhysicsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TextRenderingModule">
+      <HintPath>lib\UnityEngine.TextRenderingModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.TilemapModule">
+      <HintPath>lib\UnityEngine.TilemapModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.Timeline">
+      <HintPath>lib\UnityEngine.Timeline.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>lib\UnityEngine.UI.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIElementsModule">
+      <HintPath>lib\UnityEngine.UIElementsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>lib\UnityEngine.UIModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UNETModule">
+      <HintPath>lib\UnityEngine.UNETModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityAnalyticsModule">
+      <HintPath>lib\UnityEngine.UnityAnalyticsModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityConnectModule">
+      <HintPath>lib\UnityEngine.UnityConnectModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestAudioModule">
+      <HintPath>lib\UnityEngine.UnityWebRequestAudioModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>lib\UnityEngine.UnityWebRequestModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestTextureModule">
+      <HintPath>lib\UnityEngine.UnityWebRequestTextureModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestWWWModule">
+      <HintPath>lib\UnityEngine.UnityWebRequestWWWModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.VehiclesModule">
+      <HintPath>lib\UnityEngine.VehiclesModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.VideoModule">
+      <HintPath>lib\UnityEngine.VideoModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.VRModule">
+      <HintPath>lib\UnityEngine.VRModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.WebModule">
+      <HintPath>lib\UnityEngine.WebModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.WindModule">
+      <HintPath>lib\UnityEngine.WindModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityScript.Lang">
+      <HintPath>lib\UnityScript.Lang.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+
+</Project>
