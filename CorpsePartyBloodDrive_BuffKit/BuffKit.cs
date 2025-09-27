@@ -219,6 +219,11 @@ namespace BuffKit
             _newMaxSaveSlots = BuffKit.SaveMenuMaxSlots.Value;
             __instance.saveSlots = new SaveSlot[_newMaxSaveSlots];
             var showTimeAgo = BuffKit.SaveMenuShowTimeAgo.Value; // Cache config value.
+            Dictionary<int, DateTime> slotDateTimes = [];
+            for (int index = 0; index < _newMaxSaveSlots; index++)
+            {
+                slotDateTimes.Add(index, DateTime.MinValue); // Initialize all to MinValue.
+            }
             BuffKit.Log($"_newMaxSaveSlots: {_newMaxSaveSlots}, saveSlots: {__instance.saveSlots.Length}");
 
             // Original method:
@@ -261,9 +266,13 @@ namespace BuffKit
                     }
                     saveSlot.LocationText.Text = TranslatorService.Instance.GetText(array[1]);
                     saveSlot.DateAndTime.Text = array[2];
-                    if (showTimeAgo && DateTime.TryParse(array[2], out var parsedDateTime))
+                    if (DateTime.TryParse(array[2], out var parsedDateTime))
                     {
-                        saveSlot.DateAndTime.Text += $" ({BuffKit.GetTimeAgo(parsedDateTime)} ago)"; // MODIFIED: Show time ago.
+                        slotDateTimes[saveSlot.ListIndex] = parsedDateTime; // MODIFIED: Store date time for sorting.
+                        if (showTimeAgo)
+                        {
+                            saveSlot.DateAndTime.Text += $" ({BuffKit.GetTimeAgo(parsedDateTime)} ago)"; // MODIFIED: Show time ago.
+                        }
                     }
                     saveSlot.Thumbnail.sprite = AssetBundleManager.Instance.LoadSprite("save_icon/" + array[3] + "_EN");
                     saveSlot.IsEmpty = false;
@@ -283,11 +292,11 @@ namespace BuffKit
 
             __instance.saveSlots = BuffKit.SaveMenuSortBy.Value switch // MODIFIED: Sort save slots based on config option. Empty slots always at bottom for date sorts.
             {
-                BuffKit.SaveMenuSortByEnum.DateTimeDescending => [.. __instance.saveSlots.OrderBy(slot => slot.IsEmpty).ThenByDescending(slot => slot.DateAndTime.Text)],
-                BuffKit.SaveMenuSortByEnum.DateTimeAscending => [.. __instance.saveSlots.OrderBy(slot => slot.IsEmpty).ThenBy(slot => slot.DateAndTime.Text)],
+                BuffKit.SaveMenuSortByEnum.DateTimeDescending => [.. __instance.saveSlots.OrderBy(slot => slot.IsEmpty).ThenByDescending(slot => slotDateTimes[slot.ListIndex].Ticks)],
+                BuffKit.SaveMenuSortByEnum.DateTimeAscending => [.. __instance.saveSlots.OrderBy(slot => slot.IsEmpty).ThenBy(slot => slotDateTimes[slot.ListIndex].Ticks)],
                 BuffKit.SaveMenuSortByEnum.SlotNumberAscending => [.. __instance.saveSlots.OrderBy(slot => slot.ListIndex)],
                 BuffKit.SaveMenuSortByEnum.SlotNumberDescending => [.. __instance.saveSlots.OrderByDescending(slot => slot.ListIndex)],
-                _ => [.. __instance.saveSlots.OrderBy(slot => slot.IsEmpty).ThenByDescending(slot => slot.DateAndTime.Text)],
+                _ => [.. __instance.saveSlots.OrderBy(slot => slot.IsEmpty).ThenByDescending(slot => slotDateTimes[slot.ListIndex].Ticks)],
             };
 
             foreach (var slot in __instance.saveSlots) // MODIFIED: Reorder the slots in the UI.

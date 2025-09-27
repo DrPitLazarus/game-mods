@@ -3,11 +3,12 @@
 My mod for Corpse Party: Blood Drive.
 
 ## Download
-Visit the [release page](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.2.0). Current version is 0.2.0.
+Visit the [release page](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.2.1). Current version is 0.2.1.
 
 <details>
 <summary>Older Versions</summary>
 
+- [0.2.0](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.2.0)
 - [0.1.0](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.1.0)
 </details>  
 

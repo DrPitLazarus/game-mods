@@ -7,7 +7,7 @@
     <!--PluginInfo.PLUGIN_NAME-->
     <Product>BuffKit</Product>
     <!--PluginInfo.PLUGIN_VERSION-->
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <AssemblyTitle>Pit's mod for Corpse Party: Blood Drive.</AssemblyTitle>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
