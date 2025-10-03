@@ -29,13 +29,19 @@ namespace BuffKit
         public static ConfigEntry<bool> SaveMenuShowSlotNumbers;
         public static ConfigEntry<bool> SaveMenuShowTimeAgo;
         public static ConfigEntry<SaveMenuSortByEnum> SaveMenuSortBy;
+        public static ConfigEntry<TextSpeedEnum> TextSpeed;
+        public static ConfigEntry<bool> TextVoiceSync;
         public static ConfigEntry<KeyboardShortcut> GeneralToggleUI;
         public static ConfigEntry<bool> GameplayInfiniteBandage;
         public static ConfigEntry<bool> GameplayInfiniteStamina;
         public static ConfigEntry<bool> GameplayInfiniteTalisman;
         public static ConfigEntry<bool> ToolsOpenDataDirectory;
         public static ConfigEntry<bool> ToolsOpenGameDirectory;
+        public static ConfigEntry<bool> ToolsOpenGitHubPage;
         public static GameObject GameObject;
+        private static readonly string _defaultSettingIsVanilla = "Default is the vanilla setting.";
+        private static readonly string _defaultSettingIsMod = "Default is the mod setting.";
+        private static readonly string _gitHubUrl = "https://github.com/DrPitLazarus/game-mods/tree/master/CorpsePartyBloodDrive_BuffKit#readme";
         private Harmony _harmony;
 
         private void Awake()
@@ -52,33 +58,56 @@ namespace BuffKit
 
         private void SetupSettings()
         {
-            StartupSkipBootLogos = Config.Bind("Startup", "SkipBootLogos", true, "If true, skips the boot logos.");
-            StartupStopTitleScreenLoop = Config.Bind("Startup", "StopTitleScreenLoop", true, "If true, prevents the title screen (press any button) from looping back to the logos after 30 seconds.");
+            StartupSkipBootLogos = Config.Bind("Startup", "SkipBootLogos", true,
+                $"Skips the boot logos and go directly to the title screen. \n\n{_defaultSettingIsMod}");
+            StartupStopTitleScreenLoop = Config.Bind("Startup", "StopTitleScreenLoop", true,
+                $"Prevents the title screen (press any button) from looping back to the logos after 30 seconds. \n\n{_defaultSettingIsMod}");
             SaveMenuMaxSlots = Config.Bind("SaveMenu", "MaxSlots", 50, new ConfigDescription(
-                "Maximum number of save slots. Default is 50. Original is 20. Recommend not going over 100 saves, but I won't stop you...",
+                $"Number of save slots to display. Default is 50. Vanilla is 20. Recommend not going over 100 saves, but I won't stop you... \n\n{_defaultSettingIsMod}",
                 new AcceptableValueRange<int>(1, 1000)));
-            SaveMenuShowSlotNumbers = Config.Bind("SaveMenu", "ShowSlotNumbers", true, "If true, shows the slot numbers in the save menu.");
-            SaveMenuShowTimeAgo = Config.Bind("SaveMenu", "ShowTimeAgo", true, "If true, shows how long ago each save was made in the save menu. Example: 2d 0h 24m ago.");
+            SaveMenuShowSlotNumbers = Config.Bind("SaveMenu", "ShowSlotNumbers", true,
+                $"Shows the slot numbers in the save menu. \n\n{_defaultSettingIsMod}");
+            SaveMenuShowTimeAgo = Config.Bind("SaveMenu", "ShowTimeAgo", true,
+                $"Shows how long ago each save was made in the save menu. Example: 2d 0h 24m ago. \n\n{_defaultSettingIsMod}");
             SaveMenuSortBy = Config.Bind("SaveMenu", "SortBy", SaveMenuSortByEnum.DateTimeDescending,
-                "Changes the sort order of save slots in the save menu. Sort by date will put empty slots at the bottom.");
+                $"Changes the sort order of save slots in the save menu. Sort by date will put empty slots at the bottom. \n\n{_defaultSettingIsMod}");
+            TextSpeed = Config.Bind("Text", "Speed", TextSpeedEnum._1x,
+                $"Changes the speed that text is displayed. Disable TextVoiceSync to apply to voiced text. \n\n{_defaultSettingIsVanilla}");
+            TextSpeed.SettingChanged += (_, _) => Lua_Patch.ApplyTextSpeedSetting();
+            TextVoiceSync = Config.Bind("Text", "VoiceSync", true,
+                $"Text speed is synced to voice audio length if voiced. Otherwise, TextSpeed is used. Disable to use TextSpeed for voiced lines. \n\n{_defaultSettingIsVanilla}");
+            TextVoiceSync.SettingChanged += (_, _) => Lua_Patch.ApplyVoiceSyncSetting();
             GeneralToggleUI = Config.Bind("General", "ToggleUI", new KeyboardShortcut(KeyCode.F2),
-                "Key bind to toggle most UI elements so you can look at CGs without obstruction. Works in-game and in the Gallery of Spirits.");
-            GameplayInfiniteBandage = Config.Bind("Gameplay", "InfiniteBandage", false, "If true, always have a bandage in your inventory.");
-            GameplayInfiniteStamina = Config.Bind("Gameplay", "InfiniteStamina", false, "If true, player stamina will not decrease. Run, Rabbit, Run!");
-            GameplayInfiniteTalisman = Config.Bind("Gameplay", "InfiniteTalisman", false, "If true, always have a talisman in your inventory.");
-            ToolsOpenDataDirectory = Config.Bind("Tools", "OpenDataDirectory", false, "Click to open game data directory.");
+                $"Key bind to toggle most UI elements so you can look at CGs without obstruction. Works in-game and in the Gallery of Spirits. \n\n{_defaultSettingIsMod}");
+            GameplayInfiniteBandage = Config.Bind("Gameplay", "InfiniteBandage", false,
+                $"Always have a bandage in your inventory. \n\n{_defaultSettingIsVanilla}");
+            GameplayInfiniteStamina = Config.Bind("Gameplay", "InfiniteStamina", false,
+                $"Player stamina will not decrease. Run, Rabbit, Run! \n\n{_defaultSettingIsVanilla}");
+            GameplayInfiniteTalisman = Config.Bind("Gameplay", "InfiniteTalisman", false,
+                $"Always have a talisman in your inventory. \n\n{_defaultSettingIsVanilla}");
+            ToolsOpenDataDirectory = Config.Bind("Tools", "OpenDataDirectory", false,
+                "Click to open game data directory.");
             ToolsOpenDataDirectory.SettingChanged += (_, _) =>
             {
                 if (!ToolsOpenDataDirectory.Value) return; // Only act when set to true.
                 ToolsOpenDataDirectory.Value = false; // Reset to false.
                 Application.OpenURL(Application.persistentDataPath);
             };
-            ToolsOpenGameDirectory = Config.Bind("Tools", "OpenGameDirectory", false, "Click to open game install directory.");
+            ToolsOpenGameDirectory = Config.Bind("Tools", "OpenGameDirectory", false,
+                "Click to open game install directory.");
             ToolsOpenGameDirectory.SettingChanged += (_, _) =>
             {
                 if (!ToolsOpenGameDirectory.Value) return; // Only act when set to true.
                 ToolsOpenGameDirectory.Value = false; // Reset to false.
                 Application.OpenURL(Path.GetDirectoryName(Application.dataPath));
+            };
+            ToolsOpenGitHubPage = Config.Bind("Tools", "OpenGitHubPage", false,
+                "Click to open the GitHub page for this mod in your browser.");
+            ToolsOpenGitHubPage.SettingChanged += (_, _) =>
+            {
+                if (!ToolsOpenGitHubPage.Value) return; // Only act when set to true.
+                ToolsOpenGitHubPage.Value = false; // Reset to false.
+                Application.OpenURL(_gitHubUrl);
             };
         }
 
@@ -91,11 +120,42 @@ namespace BuffKit
             DateTimeDescending,
             [Description("Date Oldest")]
             DateTimeAscending,
-            [Description("Slot Number (Original)")]
+            [Description("Slot Number (Vanilla)")]
             SlotNumberAscending,
             [Description("Slot Number Largest")]
             SlotNumberDescending,
         }
+
+        /// <summary>
+        /// Options for text speed of the message window.
+        /// </summary>
+        public enum TextSpeedEnum
+        {
+            [Description("1x")]
+            _1x,
+            [Description("2x")]
+            _2x,
+            [Description("4x")]
+            _4x,
+            [Description("8x")]
+            _8x,
+            [Description("16x")]
+            _16x,
+            Instant,
+        }
+
+        /// <summary>
+        /// Maps TextSpeedEnum values to duration to print each character.
+        /// </summary>
+        public static Dictionary<TextSpeedEnum, float> TextSpeedValues = new()
+        {
+            { TextSpeedEnum._1x, 0.05f },
+            { TextSpeedEnum._2x, 0.025f },
+            { TextSpeedEnum._4x, 0.0125f },
+            { TextSpeedEnum._8x, 0.00625f },
+            { TextSpeedEnum._16x, 0.003125f },
+            { TextSpeedEnum.Instant, 0.0001f },
+        };
 
         /// <summary>
         /// Takes a past DateTime and returns a string representing the time elapsed since then in days, hours, and minutes.
@@ -127,7 +187,6 @@ namespace BuffKit
             var frame = stackTrace.GetFrame(1); // Get the calling method frame
             var method = frame.GetMethod();
             var classFullName = method.DeclaringType.FullName;
-            var methodName = method.Name;
 
             UnityEngine.Debug.Log($"{timestamp} [INFO] {classFullName} - {message}");
         }
@@ -523,6 +582,92 @@ namespace BuffKit
                     }
                 }
             }
+        }
+    }
+
+
+    [HarmonyPatch]
+    internal class Lua_Patch
+    {
+        /// <summary>
+        /// Apply settings for text speed and voice sync after the HauntedLua is initialized.
+        /// </summary>
+        [HarmonyPatch(typeof(HauntedLua), nameof(HauntedLua.Initialize))]
+        [HarmonyPostfix]
+        private static void Initialize()
+        {
+            BuffKit.Log("Applying text speed and voice sync settings...");
+            ApplyTextSpeedSetting();
+            ApplyVoiceSyncSetting();
+        }
+
+        /// <summary>
+        /// Overwrites the default message speed with the configured text speed value.
+        /// </summary>
+        public static void ApplyTextSpeedSetting()
+        {
+            var speedValue = BuffKit.TextSpeedValues[BuffKit.TextSpeed.Value];
+            AdventureSystem.Instance()?.lua?.DoString($"Adventure.deffult_message_speed_ = {speedValue}");
+        }
+
+        /// <summary>
+        /// Overwrites the Adventure:SetMessage function to include a voice_sync variable that uses the configured setting.
+        /// </summary>
+        public static void ApplyVoiceSyncSetting()
+        {
+            var voiceSyncLuaValue = BuffKit.TextVoiceSync.Value.ToString().ToLower();
+            var luaFunction = @$"function Adventure:SetMessage(localization_key, voice_path , any_message_speed)
+    voice_sync = {voiceSyncLuaValue} -- MODIFIED: Add voice_sync variable.
+	--デフォルトのメッセージ速度を保持する
+	self.message_speed_ = self.deffult_message_speed_
+
+	local localizedMessage = self.adventure_system_:GetLocalizedText(localization_key)
+	localizedMessage = StringEncode(localizedMessage)	
+	
+	if voice_path == nil then
+		voice_path = ''
+	end
+	self.voice_path_ = voice_path
+		
+	-- 音声が有る場合
+	if voice_path ~= '' then
+		-- 音声再生
+		local voice_time = Audio.PlayVoice(voice_path)			
+		--print('voice_time: ', voice_time)
+		
+		if voice_time > 0.0 and voice_sync then -- MODIFIED: Add voice_sync check.
+			-- 音声同期のメッセージ速度に変更
+			local message_len = localizedMessage:len()
+			self.message_speed_ = voice_time / message_len			
+			--print('message_speed_: ', self.message_speed_)
+		end
+	end
+
+	-- 再生速度指定がある場合、指定速度に設定する
+	if any_message_speed ~= nil then
+		self.message_speed_ = any_message_speed	
+		--print('message_speed_: ', self.message_speed_)
+	end
+	
+	--self.emphasis_text_:SetText('')
+	--self.emphasis_message_ = nil
+	
+	getmetatable(self).__index.SetMessage(self, localizedMessage)
+
+
+	--デフォルトのメッセージ速度にする
+	--self.message_speed_ = default_msg_spd
+
+	--メッセージログ追加
+	self:AddMessageLog(localization_key)
+	
+	--音声停止
+	Audio.StopVoice()
+
+	--メッセージ送り音
+	Audio.PlaySystem( 3 )
+end";
+            AdventureSystem.Instance()?.lua?.DoString(luaFunction);
         }
     }
 }
