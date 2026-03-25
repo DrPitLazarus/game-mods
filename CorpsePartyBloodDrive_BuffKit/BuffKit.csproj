@@ -7,7 +7,7 @@
     <!--PluginInfo.PLUGIN_NAME-->
     <Product>BuffKit</Product>
     <!--PluginInfo.PLUGIN_VERSION-->
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <AssemblyTitle>Pit's mod for Corpse Party: Blood Drive.</AssemblyTitle>
     <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
@@ -43,8 +43,8 @@
   <PropertyGroup>
     <ZipDir>$(ProjectDir)bin\temp\</ZipDir>
     <PluginPath>BepInEx\plugins\$(SolutionName)\</PluginPath>
-    <BepInExDownload>https://github.com/BepInEx/BepInEx/releases/download/v5.4.22/BepInEx_x64_5.4.22.0.zip</BepInExDownload>
-    <DownloadFileName>BepInEx_x64_5.4.22.0.zip</DownloadFileName>
+    <DownloadFileName>BepInEx_win_x64_5.4.23.5.zip</DownloadFileName>
+    <BepInExDownload>https://github.com/BepInEx/BepInEx/releases/download/v5.4.23.5/$(DownloadFileName)</BepInExDownload>
     <DataDirName>CorpseParty_BloodDrive_Data</DataDirName>
   </PropertyGroup>
 
@@ -70,12 +70,12 @@
     <Message Text="Extract .\bin\$(DownloadFileName) to .\bin\temp\" Importance="high" />
     <Unzip SourceFiles="$(ProjectDir)bin\$(DownloadFileName)" DestinationFolder="$(ZipDir)" />
 
-    <DownloadFile
+    <!--<DownloadFile
       SourceUrl="https://github.com/BepInEx/BepInEx.ConfigurationManager/releases/download/v18.4.1/BepInEx.ConfigurationManager_BepInEx5_v18.4.1.zip"
       DestinationFolder="$(ProjectDir)bin"
       SkipUnchangedFiles="true" />
     <Message Text="Extract .\bin\BepInEx.ConfigurationManager_BepInEx5_v18.4.1.zip to .\bin\temp\" Importance="high" />
-    <Unzip SourceFiles="$(ProjectDir)bin\BepInEx.ConfigurationManager_BepInEx5_v18.4.1.zip" DestinationFolder="$(ZipDir)" />
+    <Unzip SourceFiles="$(ProjectDir)bin\BepInEx.ConfigurationManager_BepInEx5_v18.4.1.zip" DestinationFolder="$(ZipDir)" />-->
   </Target>
 
   <Target Name="CopyToGameDir" AfterTargets="StageModDir" Condition="$(Configuration) == 'Release to GameDir'">

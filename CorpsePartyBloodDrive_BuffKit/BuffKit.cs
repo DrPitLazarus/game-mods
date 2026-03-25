@@ -3,7 +3,11 @@ using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
 using Haunted;
+using Scene.BonusMenu;
+using Scene.ChapterClear;
 using Scene.Map;
+using Scene.OptionMenu;
+using Scene.Title;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -23,26 +27,39 @@ namespace BuffKit
     [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
     internal class BuffKit : BaseUnityPlugin
     {
+        public static ConfigEntry<KeyboardShortcut> GeneralToggleModMenuUI;
+        public static ConfigEntry<KeyboardShortcut> GeneralToggleSkip;
+        public static ConfigEntry<KeyboardShortcut> GeneralToggleUI;
+        public static ConfigEntry<bool> GeneralVSync;
+        public static ConfigEntry<bool> GeneralFramerateLimit60;
+        public static ConfigEntry<bool> GeneralHideRefreshRate;
         public static ConfigEntry<bool> StartupSkipBootLogos;
         public static ConfigEntry<bool> StartupStopTitleScreenLoop;
         public static ConfigEntry<int> SaveMenuMaxSlots;
         public static ConfigEntry<bool> SaveMenuShowSlotNumbers;
         public static ConfigEntry<bool> SaveMenuShowTimeAgo;
+        //public static ConfigEntry<bool> SaveMenuModifyOptions;
+        //public static ConfigEntry<bool> SaveMenuAutoSaveSystemData;
         public static ConfigEntry<SaveMenuSortByEnum> SaveMenuSortBy;
         public static ConfigEntry<TextSpeedEnum> TextSpeed;
         public static ConfigEntry<bool> TextVoiceSync;
-        public static ConfigEntry<KeyboardShortcut> GeneralToggleUI;
+        public static ConfigEntry<bool> GameplayAlwaysRun;
         public static ConfigEntry<bool> GameplayInfiniteBandage;
+        public static ConfigEntry<bool> GameplayInfiniteBatteryItem;
         public static ConfigEntry<bool> GameplayInfiniteStamina;
         public static ConfigEntry<bool> GameplayInfiniteTalisman;
+        //public static ConfigEntry<bool> GameplayMenuAnytime;
         public static ConfigEntry<bool> ToolsOpenDataDirectory;
         public static ConfigEntry<bool> ToolsOpenGameDirectory;
+        public static ConfigEntry<bool> ToolsOpenOutputLog;
         public static ConfigEntry<bool> ToolsOpenGitHubPage;
         public static GameObject GameObject;
         private static readonly string _defaultSettingIsVanilla = "Default is the vanilla setting.";
         private static readonly string _defaultSettingIsMod = "Default is the mod setting.";
         private static readonly string _gitHubUrl = "https://github.com/DrPitLazarus/game-mods/tree/master/CorpsePartyBloodDrive_BuffKit#readme";
         private Harmony _harmony;
+
+        public static bool MapSystemIsActive => MapSystem.instance_ != null && MapSystem.instance_.activated;
 
         private void Awake()
         {
@@ -51,6 +68,7 @@ namespace BuffKit
             GameObject = gameObject;
             Log($"{PluginInfo.PLUGIN_NAME} loaded!");
 
+            GameObject.AddComponent<ModMenu>();
             GameObject.AddComponent<GameplayInventory_Patch>();
 
             SetupSettings();
@@ -58,33 +76,59 @@ namespace BuffKit
 
         private void SetupSettings()
         {
+            GeneralToggleModMenuUI = Config.Bind("General", "ToggleModMenuUI", new KeyboardShortcut(KeyCode.F10),
+                $"Key bind to toggle the mod settings menu. \n\n{_defaultSettingIsMod}");
+            GeneralToggleSkip = Config.Bind("General", "ToggleSkip", new KeyboardShortcut(KeyCode.K),
+                $"Key bind to toggle skip dialogue. Displays text overlay in the bottom-right when active. \n\n{_defaultSettingIsMod}");
+            GeneralToggleUI = Config.Bind("General", "ToggleUI", new KeyboardShortcut(KeyCode.H),
+                $"Key bind to toggle most UI elements so you can look at CGs without obstruction. Works in-game and in the Gallery of Spirits. \n\n{_defaultSettingIsMod}");
+            GeneralVSync = Config.Bind("General", "VSync", false,
+                $"Use your display's refresh rate. Vanilla is enabled by default. \n\n{_defaultSettingIsMod}");
+            GeneralVSync.SettingChanged += (_, _) => QualitySettings.vSyncCount = GeneralVSync.Value ? 1 : 0;
+            GeneralFramerateLimit60 = Config.Bind("General", "FramerateLimit60", true,
+                $"Limit framerate to 60 FPS when VSync is disabled. Otherwise unlimited. \n\n{_defaultSettingIsMod}");
+            GeneralFramerateLimit60.SettingChanged += (_, _) => Application.targetFrameRate = GeneralFramerateLimit60.Value ? 60 : -1;
+            GeneralHideRefreshRate = Config.Bind("General", "HideRefreshRate", true,
+                $"Removes the refresh rate from the resolution text as it is not used in the game and just takes up space. Example: 1920x1080@360 becomes 1920x1080. \n\n{_defaultSettingIsMod}");
             StartupSkipBootLogos = Config.Bind("Startup", "SkipBootLogos", true,
                 $"Skips the boot logos and go directly to the title screen. \n\n{_defaultSettingIsMod}");
             StartupStopTitleScreenLoop = Config.Bind("Startup", "StopTitleScreenLoop", true,
                 $"Prevents the title screen (press any button) from looping back to the logos after 30 seconds. \n\n{_defaultSettingIsMod}");
             SaveMenuMaxSlots = Config.Bind("SaveMenu", "MaxSlots", 50, new ConfigDescription(
-                $"Number of save slots to display. Default is 50. Vanilla is 20. Recommend not going over 100 saves, but I won't stop you... \n\n{_defaultSettingIsMod}",
+                $"Number of save slots to display. Default is 50. Vanilla is 20. Recommend not going over 100 saves, but I won't stop you...Increases time to load the save menu." +
+                $"\n\nFewer save slots won't delete data and only displays slots up to it." +
+                $"\n\n{_defaultSettingIsMod}",
                 new AcceptableValueRange<int>(1, 1000)));
+            //SaveMenuModifyOptions = Config.Bind("SaveMenu", "ModifyOptions", true,
+            //    $"Adds EditLocationText and Delete options to saves in the save menu. \n\n{_defaultSettingIsMod}");
             SaveMenuShowSlotNumbers = Config.Bind("SaveMenu", "ShowSlotNumbers", true,
                 $"Shows the slot numbers in the save menu. \n\n{_defaultSettingIsMod}");
             SaveMenuShowTimeAgo = Config.Bind("SaveMenu", "ShowTimeAgo", true,
                 $"Shows how long ago each save was made in the save menu. Example: 2d 0h 24m ago. \n\n{_defaultSettingIsMod}");
             SaveMenuSortBy = Config.Bind("SaveMenu", "SortBy", SaveMenuSortByEnum.DateTimeDescending,
-                $"Changes the sort order of save slots in the save menu. Sort by date will put empty slots at the bottom. \n\n{_defaultSettingIsMod}");
+                $"Changes the sort order of save slots in the save menu. Sort by date will put empty slots at the bottom." +
+                $"\n\nWhen Saving, the first empty save slot is moved to the top. \nWhen Loading, empty save slots are hidden." +
+                $"\n\n{_defaultSettingIsMod}");
+            //SaveMenuAutoSaveSystemData = Config.Bind("SaveMenu", "AutoSaveSystemData", true,
+            //    $"Automatically press yes when prompted to save system data. I don't see a reason why you wouldn't. \n\n{_defaultSettingIsMod}");
             TextSpeed = Config.Bind("Text", "Speed", TextSpeedEnum._1x,
                 $"Changes the speed that text is displayed. Disable TextVoiceSync to apply to voiced text. \n\n{_defaultSettingIsVanilla}");
             TextSpeed.SettingChanged += (_, _) => Lua_Patch.ApplyTextSpeedSetting();
-            TextVoiceSync = Config.Bind("Text", "VoiceSync", true,
-                $"Text speed is synced to voice audio length if voiced. Otherwise, TextSpeed is used. Disable to use TextSpeed for voiced lines. \n\n{_defaultSettingIsVanilla}");
+            TextVoiceSync = Config.Bind("Text", "VoiceSync", false,
+                $"Text speed is synced to voice audio length if voiced. Otherwise, TextSpeed is used. Disable to use TextSpeed for voiced lines. Vanilla is enabled by default. \n\n{_defaultSettingIsMod}");
             TextVoiceSync.SettingChanged += (_, _) => Lua_Patch.ApplyVoiceSyncSetting();
-            GeneralToggleUI = Config.Bind("General", "ToggleUI", new KeyboardShortcut(KeyCode.F2),
-                $"Key bind to toggle most UI elements so you can look at CGs without obstruction. Works in-game and in the Gallery of Spirits. \n\n{_defaultSettingIsMod}");
+            GameplayAlwaysRun = Config.Bind("Gameplay", "AlwaysRun", false,
+                $"Run by default. Use run key to walk. \n\n{_defaultSettingIsVanilla}");
             GameplayInfiniteBandage = Config.Bind("Gameplay", "InfiniteBandage", false,
                 $"Always have a bandage in your inventory. \n\n{_defaultSettingIsVanilla}");
+            GameplayInfiniteBatteryItem = Config.Bind("Gameplay", "InfiniteBatteryItem", false,
+                $"Always have a battery in your inventory. For those who want the thrilling and immersive experience of manually reloading your flashlight battery instead of the vanilla infinite battery... weirdo. This doesn't toggle the vanilla infinite battery option. \n\n{_defaultSettingIsVanilla}");
             GameplayInfiniteStamina = Config.Bind("Gameplay", "InfiniteStamina", false,
                 $"Player stamina will not decrease. Run, Rabbit, Run! \n\n{_defaultSettingIsVanilla}");
             GameplayInfiniteTalisman = Config.Bind("Gameplay", "InfiniteTalisman", false,
                 $"Always have a talisman in your inventory. \n\n{_defaultSettingIsVanilla}");
+            //GameplayMenuAnytime = Config.Bind("Gameplay", "MenuAnytime", true,
+            //    $"[Experimental] Allows opening the menu in dialogue and cutscenes. Does not work... \n\n{_defaultSettingIsMod}");
             ToolsOpenDataDirectory = Config.Bind("Tools", "OpenDataDirectory", false,
                 "Click to open game data directory.");
             ToolsOpenDataDirectory.SettingChanged += (_, _) =>
@@ -100,6 +144,14 @@ namespace BuffKit
                 if (!ToolsOpenGameDirectory.Value) return; // Only act when set to true.
                 ToolsOpenGameDirectory.Value = false; // Reset to false.
                 Application.OpenURL(Path.GetDirectoryName(Application.dataPath));
+            };
+            ToolsOpenOutputLog = Config.Bind("Tools", "OpenOutputLog", false,
+                "Click to open the Unity output_log.txt.");
+            ToolsOpenOutputLog.SettingChanged += (_, _) =>
+            {
+                if (!ToolsOpenOutputLog.Value) return; // Only act when set to true.
+                ToolsOpenOutputLog.Value = false; // Reset to false.
+                Application.OpenURL(Path.Combine(Application.persistentDataPath, "output_log.txt"));
             };
             ToolsOpenGitHubPage = Config.Bind("Tools", "OpenGitHubPage", false,
                 "Click to open the GitHub page for this mod in your browser.");
@@ -157,6 +209,7 @@ namespace BuffKit
             { TextSpeedEnum.Instant, 0.0001f },
         };
 
+
         /// <summary>
         /// Takes a past DateTime and returns a string representing the time elapsed since then in days, hours, and minutes.
         /// </summary>
@@ -184,7 +237,7 @@ namespace BuffKit
             var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
 
             var stackTrace = new StackTrace();
-            var frame = stackTrace.GetFrame(1); // Get the calling method frame
+            var frame = stackTrace.GetFrame(1);
             var method = frame.GetMethod();
             var classFullName = method.DeclaringType.FullName;
 
@@ -228,9 +281,9 @@ namespace BuffKit
         /// <summary>
         /// On the title screen (press any button), if enabled, prevents loading the logo scene after 30 seconds.
         /// </summary>
-        [HarmonyPatch(typeof(Scene.Title.StatControl), nameof(Scene.Title.StatControl.Update))]
+        [HarmonyPatch(typeof(StatControl), nameof(StatControl.Update))]
         [HarmonyPrefix]
-        private static bool Update(Scene.Title.StatControl __instance)
+        private static bool Update(StatControl __instance)
         {
             if (!BuffKit.StartupStopTitleScreenLoop.Value) return true; // Don't modify, run original method.
             // Original method:
@@ -349,7 +402,12 @@ namespace BuffKit
                 }
             }
 
-            __instance.saveSlots = BuffKit.SaveMenuSortBy.Value switch // MODIFIED: Sort save slots based on config option. Empty slots always at bottom for date sorts.
+            // MODIFIED SECTION.
+            // Find first empty slot index to put it at the top when saving.
+            var firstEmptySlotIndex = Array.FindIndex(__instance.saveSlots, slot => slot.IsEmpty);
+
+            // Sort save slots based on config option. Empty slots always at bottom for date sorts.
+            __instance.saveSlots = BuffKit.SaveMenuSortBy.Value switch
             {
                 BuffKit.SaveMenuSortByEnum.DateTimeDescending => [.. __instance.saveSlots.OrderBy(slot => slot.IsEmpty).ThenByDescending(slot => slotDateTimes[slot.ListIndex].Ticks)],
                 BuffKit.SaveMenuSortByEnum.DateTimeAscending => [.. __instance.saveSlots.OrderBy(slot => slot.IsEmpty).ThenBy(slot => slotDateTimes[slot.ListIndex].Ticks)],
@@ -358,10 +416,25 @@ namespace BuffKit
                 _ => [.. __instance.saveSlots.OrderBy(slot => slot.IsEmpty).ThenByDescending(slot => slotDateTimes[slot.ListIndex].Ticks)],
             };
 
-            foreach (var slot in __instance.saveSlots) // MODIFIED: Reorder the slots in the UI.
+            // Reorder the slots in the UI.
+            foreach (var slot in __instance.saveSlots)
             {
-                slot.transform.SetAsLastSibling();
+                // Save menu, move first empty slot to the top.
+                if (__instance.CurrentState == SaveMenu.MenuState.Save && slot.ListIndex == firstEmptySlotIndex)
+                {
+                    slot.transform.SetAsFirstSibling();
+                }
+                else
+                {
+                    slot.transform.SetAsLastSibling();
+                    // Load menu, hide empty slots.
+                    if (__instance.CurrentState == SaveMenu.MenuState.Load && slot.IsEmpty)
+                    {
+                        slot.gameObject.SetActive(false);
+                    }
+                }
             }
+            // END MODIFIED SECTION.
 
             __instance.selectableList.GetSelectableChildren();
             SaveMenu.MenuState currentState = __instance.CurrentState;
@@ -402,11 +475,18 @@ namespace BuffKit
         private static TextMeshProUGUI _nameWindowText;
         private static GameObject _messageWindowNextIcon;
         private static GameObject _bustUp;
-        private static GameObject _mapNameWindow;
+        //private static GameObject _mapNameWindow;
         private static GameObject _choiceWindow;
         private static TextMeshProUGUI _choiceWindowText1;
         private static GameObject _galleryBackButton;
+        private static Image _galleryBackButtonImage;
+        private static TextMeshProUGUI[] _galleryBackButtonTexts;
         private static GameObject _gallerySwitchButton;
+        private static GameObject _galleryOfSpirits;
+
+        public static bool GalleryIsActive => _galleryOfSpirits != null && _galleryOfSpirits.activeSelf;
+
+        public static bool MapSystemOrGalleryIsActive => (MapSystem.instance_ != null && MapSystem.instance_.activated) || GalleryIsActive;
 
         /// <summary>
         /// Main initialization patch to get references to UI elements to toggle on/off.
@@ -415,11 +495,11 @@ namespace BuffKit
         [HarmonyPostfix]
         private static void AdventureSystem_Start()
         {
-            BuffKit.Log("Initializing AdventureSystem_Start()...");
+            BuffKit.Log("Initializing AdventureSystem_Start(), collecting GameObjects to toggle...");
             _objectsToToggle = [
                 _messageWindowNextIcon = GameObject.Find("/AdventureSystem/Canvas/MessageWindow/NextIcon"),
                 _bustUp = GameObject.Find("/AdventureSystem/Canvas/BustUp"),
-                _mapNameWindow = GameObject.Find("/AdventureSystem/Canvas/MapName/Window"),
+                //_mapNameWindow = GameObject.Find("/AdventureSystem/Canvas/MapName/Window"),
                 _choiceWindow = GameObject.Find("/AdventureSystem/Canvas/ChoiceWindow"),
             ];
             _componentsToToggle = [
@@ -427,8 +507,6 @@ namespace BuffKit
                 _messageWindowText = GameObject.Find("/AdventureSystem/Canvas/MessageWindow/Message")?.GetComponent<TextMeshProUGUI>(),
                 _nameWindowText = GameObject.Find("/AdventureSystem/Canvas/NameWindow/Name")?.GetComponent<TextMeshProUGUI>(),
             ];
-            _objectsToToggle = [.. _objectsToToggle.Where(obj => obj != null)];
-            _componentsToToggle = [.. _componentsToToggle.Where(comp => comp != null)];
             _choiceWindowText1 = _choiceWindow?.transform.GetChild(0)?.GetComponent<TextMeshProUGUI>();
             _initialized = true;
         }
@@ -436,23 +514,27 @@ namespace BuffKit
         /// <summary>
         /// Adds references to gallery buttons when opening the album. They get destroyed when leaving the album.
         /// </summary>
-        [HarmonyPatch(typeof(Scene.BonusMenu.Album), nameof(Scene.BonusMenu.Album.OnEnable))]
+        [HarmonyPatch(typeof(Album), nameof(Album.OnEnable))]
         [HarmonyPostfix]
         private static void Album_OnEnable()
         {
-            _galleryBackButton = GameObject.Find("/MenuCanvas/BonusMenuParent/GalleryOfSpirits/ImageInspect/Back");
-            _gallerySwitchButton = GameObject.Find("/MenuCanvas/BonusMenuParent/GalleryOfSpirits/ImageInspect/SwitchImage");
+            _galleryOfSpirits ??= GameObject.Find("/MenuCanvas/BonusMenuParent/GalleryOfSpirits");
+            _galleryBackButton ??= GameObject.Find("/MenuCanvas/BonusMenuParent/GalleryOfSpirits/ImageInspect/Back");
+            _galleryBackButtonImage ??= _galleryBackButton.GetComponent<Image>();
+            _galleryBackButtonTexts ??= _galleryBackButton?.GetComponentsInChildren<TextMeshProUGUI>();
+            _gallerySwitchButton ??= GameObject.Find("/MenuCanvas/BonusMenuParent/GalleryOfSpirits/ImageInspect/SwitchImage");
         }
 
         /// <summary>
         /// Sets the position of the map name window to the outer_position (hidden) so the toggle doesn't show it.
+        /// Doesn't always set the position correctly. Honestly not needed to toggle.
         /// </summary>
-        [HarmonyPatch(typeof(MapNameWindow), nameof(MapNameWindow.Initialize))]
-        [HarmonyPostfix]
-        private static void MapNameWindow_Initialize(MapNameWindow __instance)
-        {
-            __instance.window_.rectTransform.position = __instance.outer_position_;
-        }
+        //[HarmonyPatch(typeof(MapNameWindow), nameof(MapNameWindow.Initialize))]
+        //[HarmonyPostfix]
+        //private static void MapNameWindow_Initialize(MapNameWindow __instance)
+        //{
+        //    __instance.window_.rectTransform.position = __instance.outer_position_;
+        //}
 
         /// <summary>
         /// Update method to check for key press and apply hiding/showing the UI.
@@ -462,10 +544,16 @@ namespace BuffKit
         private static void Update()
         {
             if (!_initialized) return;
-            if (BuffKit.GeneralToggleUI.Value.IsDown())
+            if (BuffKit.GeneralToggleUI.Value.IsDown() && MapSystemOrGalleryIsActive)
             {
                 _shouldShowUi = !_shouldShowUi;
                 BuffKit.Log($"Toggling UI... _shouldShowUI: {_shouldShowUi}.");
+                ApplySetActive();
+            }
+            if (!_shouldShowUi && !MapSystemOrGalleryIsActive)
+            {
+                _shouldShowUi = !_shouldShowUi;
+                BuffKit.Log("MapSystem or Gallery is not active, showing UI...");
                 ApplySetActive();
             }
             // Make sure UI is hidden when it should be.
@@ -483,45 +571,80 @@ namespace BuffKit
             if (_shouldShowUi)
             {
                 // Reactivate certain UI elements.
-                _bustUp.SetActive(true);
-                _mapNameWindow.SetActive(true);
-                var choice1HasTextSet = !_choiceWindowText1.text.Contains("icon_off");
-                _choiceWindow.SetActive(choice1HasTextSet);
-                var messageWindowHasText = _messageWindowText.text != string.Empty;
-                _messageWindowImage.enabled = messageWindowHasText;
-                _messageWindowText.enabled = messageWindowHasText;
-                _messageWindowNextIcon.SetActive(messageWindowHasText); // Didn't see a way to check status... might be fine to show it.
-                var nameWindowHasText = _nameWindowText.text != string.Empty && _nameWindowText.text != "Name of Character";
-                _nameWindowText.enabled = messageWindowHasText && nameWindowHasText;
+                _bustUp?.SetActive(true);
+                //_mapNameWindow.SetActive(true);
+                var choice1HasTextSet = !_choiceWindowText1?.text.Contains("icon_off") ?? false;
+                _choiceWindow?.SetActive(choice1HasTextSet);
+                var messageWindowHasText = _messageWindowText?.text != string.Empty;
+                _messageWindowImage?.enabled = messageWindowHasText;
+                _messageWindowText?.enabled = messageWindowHasText;
+                _messageWindowNextIcon?.SetActive(messageWindowHasText); // Didn't see a way to check status... might be fine to show it.
+                var nameWindowHasText = _nameWindowText?.text != string.Empty && _nameWindowText?.text != "Name of Character";
+                _nameWindowText?.enabled = messageWindowHasText && nameWindowHasText;
             }
             else
             {
                 // Deactivate all UI elements.
-                foreach (var obj in _objectsToToggle)
+                foreach (var obj in _objectsToToggle ?? Enumerable.Empty<GameObject>())
                 {
-                    TrySetActive(obj, _shouldShowUi);
+                    obj?.SetActive(_shouldShowUi);
                 }
-                foreach (var component in _componentsToToggle)
+                foreach (var component in _componentsToToggle ?? Enumerable.Empty<MonoBehaviour>())
                 {
-                    if (component.gameObject == null) continue;
-                    component.enabled = _shouldShowUi;
+                    component?.enabled = _shouldShowUi;
                 }
             }
-            // Always deactivate/activate gallery buttons if they exist.
-            TrySetActive(_galleryBackButton, _shouldShowUi);
-            TrySetActive(_gallerySwitchButton, _shouldShowUi);
+            if (GalleryIsActive)
+            {
+                // Always deactivate/activate gallery buttons if they exist.
+                _galleryBackButtonImage?.enabled = _shouldShowUi;
+                foreach (var component in _galleryBackButtonTexts ?? Enumerable.Empty<TextMeshProUGUI>())
+                {
+                    component?.enabled = _shouldShowUi;
+                }
+                _gallerySwitchButton?.SetActive(_shouldShowUi);
+            }
         }
+    }
+
+
+    [HarmonyPatch]
+    internal class ToggleSkip_Patch
+    {
+        private static bool _isSkipping = false;
+
+        public static bool IsSkipping => _isSkipping;
 
         /// <summary>
-        /// Attempts to set the active state of the specified <see cref="GameObject"/>.
+        /// Tells LUA that the skip key is being pressed.
         /// </summary>
-        /// <param name="obj">The <see cref="GameObject"/> whose active state is to be set. If <paramref name="obj"/> is <see
-        /// langword="null"/>, the method does nothing.</param>
-        /// <param name="state">The desired active state.</param>
-        private static void TrySetActive(GameObject obj, bool state)
+        /// <param name="action">Key.</param>
+        /// <param name="__result">Bool, key is being pressed.</param>
+        [HarmonyPatch(typeof(VitaButtonInputForLua), nameof(VitaButtonInputForLua.IsAction))]
+        [HarmonyPostfix]
+        private static void IsAction(int action, ref bool __result)
         {
-            if (obj == null) return;
-            obj.SetActive(state);
+            if (_isSkipping && action == (int)VitaButtonInput.RewiredAction.SkipMessage)
+            {
+                __result = true;
+            }
+        }
+
+        [HarmonyPatch(typeof(AdventureSystem), nameof(AdventureSystem.Update))]
+        [HarmonyPostfix]
+        private static void Update()
+        {
+            if (BuffKit.GeneralToggleSkip.Value.IsDown() && BuffKit.MapSystemIsActive)
+            {
+                _isSkipping = !_isSkipping;
+                BuffKit.Log($"Toggling Skip... _isSkipping: {_isSkipping}.");
+            }
+
+            if (_isSkipping && !BuffKit.MapSystemIsActive)
+            {
+                _isSkipping = !_isSkipping;
+                BuffKit.Log("MapSystem is not active, disabling ToggleSkip...");
+            }
         }
     }
 
@@ -529,6 +652,21 @@ namespace BuffKit
     [HarmonyPatch]
     internal class Gameplay_Patch
     {
+        /// <summary>
+        /// If enabled, Run by default. Use run key to walk.
+        /// </summary>
+        /// <param name="run"></param>
+        /// <returns></returns>
+        [HarmonyPatch(typeof(MapPlayerCharacter), nameof(MapPlayerCharacter.SetMoveVector))]
+        [HarmonyPrefix]
+        private static bool SetMoveVectorPrefix(ref bool run)
+        {
+            if (!BuffKit.GameplayAlwaysRun.Value) return true; // Run original method.
+            var isHoldingRun = MapSystem.instance_.input.IsHoldingAction(VitaButtonInput.RewiredAction.Run);
+            run = !isHoldingRun; // Invert run to walk. Hold run button to walk, release to run.
+            return true; // Run original method.
+        }
+
         /// <summary>
         /// If enabled, sets players stamina to max for infinite stamina. Run, Rabbit, Run!
         /// </summary>
@@ -539,6 +677,36 @@ namespace BuffKit
             if (!BuffKit.GameplayInfiniteStamina.Value) return; // Do nothing.
             __instance.stamina = __instance.max_stamina;
         }
+
+        /// <summary>
+        /// Removes the prohibition on opening the menu in certain situations like dialogue and cutscenes.
+        /// TODO: Currently doesn't work, but it's a start.
+        /// </summary>
+        //[HarmonyPatch(typeof(MapSystem), nameof(MapSystem.UpdatePlayerCharacter))]
+        //[HarmonyPostfix]
+        //private static void UpdatePlayerCharacter(MapSystem __instance)
+        //{
+        //    if (!BuffKit.GameplayMenuAnytime.Value) return;
+
+        //    if (__instance.input.IsActionOnce(VitaButtonInput.RewiredAction.OpenMenu))
+        //    {
+        //        if (/*!__instance.prohibit_open_menu_ &&*/ !__instance.is_lurking_player)
+        //        {
+        //            AudioSystem.Instance().PlaySystem(AudioSystem.SystemClip.kSystemMenu);
+        //            __instance.SaveMapData();
+        //            __instance.SaveTriggerFlag();
+        //            Common.Instance().LoadWithFading = true;
+        //            if (__instance.common_.LoadLevel("Menu", LoadSceneMode.Single))
+        //            {
+        //                HauntedLua.Instance().lua.CallLuaFunction("ChapterMenu");
+        //                MapSystem.Instance().map_name_window_.SetActive(false);
+        //                __instance.SetAdventureTimerPause(true);
+        //                __instance.SetDispBloodActive(false);
+        //                __instance.SetDispNoiseActive(false);
+        //            }
+        //        }
+        //    }
+        //}
     }
 
 
@@ -546,6 +714,7 @@ namespace BuffKit
     {
         private static readonly float _checkInterval = 1f;
         private static readonly string _bandageItemId = "item04";
+        private static readonly string _batteryItemId = "item06";
         private static readonly string _talismanItemId = "item11";
 
         private void Start()
@@ -563,7 +732,7 @@ namespace BuffKit
             {
                 yield return new WaitForSeconds(_checkInterval);
                 var gameData = Common.Instance().GameData;
-                if (gameData == null) continue;
+                if (gameData == null || !BuffKit.MapSystemIsActive) continue;
 
                 if (BuffKit.GameplayInfiniteBandage.Value)
                 {
@@ -571,6 +740,14 @@ namespace BuffKit
                     {
                         BuffKit.Log("InfiniteBandage: not found, adding one...");
                         gameData.AddItem(_bandageItemId);
+                    }
+                }
+                if (BuffKit.GameplayInfiniteBatteryItem.Value)
+                {
+                    if (!gameData.items.Contains(_batteryItemId))
+                    {
+                        BuffKit.Log("InfiniteBatteryItem: not found, adding one...");
+                        gameData.AddItem(_batteryItemId);
                     }
                 }
                 if (BuffKit.GameplayInfiniteTalisman.Value)
@@ -584,6 +761,83 @@ namespace BuffKit
             }
         }
     }
+
+
+    /// <summary>
+    /// Patch to make the next message icon animate with Time.deltaTime instead of every frame, which looks crazy at 360 fps.
+    /// </summary>
+    [HarmonyPatch]
+    internal class MessageWindowNextIcon_Patch
+    {
+        private static readonly int _targetFrameRate = 60;
+        private static readonly float _interval = 1 / _targetFrameRate;
+        private static float _timer = 0f;
+
+        [HarmonyPatch(typeof(MessageWindowNextIcon), nameof(MessageWindowNextIcon.Update))]
+        [HarmonyPrefix]
+        private static bool Update()
+        {
+            if (BuffKit.GeneralFramerateLimit60.Value && !BuffKit.GeneralVSync.Value) return true; // Run original method which already looks fine.
+
+            _timer += Time.deltaTime;
+
+            if (_timer >= _interval)
+            {
+                _timer = 0;
+                return true; // Run original method to animate the icon.
+            }
+
+            return false; // Don't run original method.
+        }
+    }
+
+
+    [HarmonyPatch]
+    internal class GraphicsSettingsMenu_Patch
+    {
+        /// <summary>
+        /// Removes the refresh rate from the resolution text as it is not used in the game and just takes up space. Example: 1920x1080@360 becomes 1920x1080.
+        /// </summary>
+        [HarmonyPatch(typeof(GraphicsSettingsMenu), nameof(GraphicsSettingsMenu.ApplySettingsToUI))]
+        [HarmonyPostfix]
+        private static void ApplySettingsToUI(GraphicsSettingsMenu __instance)
+        {
+            if (!BuffKit.GeneralHideRefreshRate.Value) return;
+            var currentText = __instance.resolutionOptionSwitcher.optionText.Text;
+            var newText = currentText.Split('@')[0].Trim(); // Remove refresh rate info after @ symbol.
+            __instance.resolutionOptionSwitcher.SetText(newText);
+        }
+
+        /// <summary>
+        /// Apply VSync and framerate settings on title screen.
+        /// </summary>
+        [HarmonyPatch(typeof(PageSwitcher), nameof(PageSwitcher.Start))]
+        [HarmonyPostfix]
+        private static void Start()
+        {
+            BuffKit.Log("Applying VSync and Framerate settings...");
+            QualitySettings.vSyncCount = BuffKit.GeneralVSync.Value ? 1 : 0;
+            Application.targetFrameRate = BuffKit.GeneralFramerateLimit60.Value ? 60 : -1;
+        }
+    }
+
+
+    /// <summary>
+    /// Automatically press yes when prompted to save system data. I don't see a reason why you wouldn't.
+    /// TODO: Gets stuck on black screen after chapter clear if enabled. Works fine if you get a game over.
+    /// </summary>
+    //[HarmonyPatch]
+    //internal class ChapterClear_Patch
+    //{
+    //    [HarmonyPatch(typeof(ChapterClear), nameof(ChapterClear.Initialize))]
+    //    [HarmonyPostfix]
+    //    private static void Initialize(ChapterClear __instance)
+    //    {
+    //        if (!BuffKit.SaveMenuAutoSaveSystemData.Value) return;
+    //        BuffKit.Log("Enabled, automatically pressing yes on save system window prompt...");
+    //        __instance.choice_windows.OnYesButtonPressed();
+    //    }
+    //}
 
 
     [HarmonyPatch]
@@ -618,54 +872,54 @@ namespace BuffKit
             var voiceSyncLuaValue = BuffKit.TextVoiceSync.Value.ToString().ToLower();
             var luaFunction = @$"function Adventure:SetMessage(localization_key, voice_path , any_message_speed)
     voice_sync = {voiceSyncLuaValue} -- MODIFIED: Add voice_sync variable.
-	--デフォルトのメッセージ速度を保持する
-	self.message_speed_ = self.deffult_message_speed_
+    --デフォルトのメッセージ速度を保持する
+    self.message_speed_ = self.deffult_message_speed_
 
-	local localizedMessage = self.adventure_system_:GetLocalizedText(localization_key)
-	localizedMessage = StringEncode(localizedMessage)	
-	
-	if voice_path == nil then
-		voice_path = ''
-	end
-	self.voice_path_ = voice_path
-		
-	-- 音声が有る場合
-	if voice_path ~= '' then
-		-- 音声再生
-		local voice_time = Audio.PlayVoice(voice_path)			
-		--print('voice_time: ', voice_time)
-		
-		if voice_time > 0.0 and voice_sync then -- MODIFIED: Add voice_sync check.
-			-- 音声同期のメッセージ速度に変更
-			local message_len = localizedMessage:len()
-			self.message_speed_ = voice_time / message_len			
-			--print('message_speed_: ', self.message_speed_)
-		end
-	end
+    local localizedMessage = self.adventure_system_:GetLocalizedText(localization_key)
+    localizedMessage = StringEncode(localizedMessage)	
+    
+    if voice_path == nil then
+        voice_path = ''
+    end
+    self.voice_path_ = voice_path
+        
+    -- 音声が有る場合
+    if voice_path ~= '' then
+        -- 音声再生
+        local voice_time = Audio.PlayVoice(voice_path)			
+        --print('voice_time: ', voice_time)
+        
+        if voice_time > 0.0 and voice_sync then -- MODIFIED: Add voice_sync check.
+            -- 音声同期のメッセージ速度に変更
+            local message_len = localizedMessage:len()
+            self.message_speed_ = voice_time / message_len			
+            --print('message_speed_: ', self.message_speed_)
+        end
+    end
 
-	-- 再生速度指定がある場合、指定速度に設定する
-	if any_message_speed ~= nil then
-		self.message_speed_ = any_message_speed	
-		--print('message_speed_: ', self.message_speed_)
-	end
-	
-	--self.emphasis_text_:SetText('')
-	--self.emphasis_message_ = nil
-	
-	getmetatable(self).__index.SetMessage(self, localizedMessage)
+    -- 再生速度指定がある場合、指定速度に設定する
+    if any_message_speed ~= nil then
+        self.message_speed_ = any_message_speed	
+        --print('message_speed_: ', self.message_speed_)
+    end
+    
+    --self.emphasis_text_:SetText('')
+    --self.emphasis_message_ = nil
+    
+    getmetatable(self).__index.SetMessage(self, localizedMessage)
 
 
-	--デフォルトのメッセージ速度にする
-	--self.message_speed_ = default_msg_spd
+    --デフォルトのメッセージ速度にする
+    --self.message_speed_ = default_msg_spd
 
-	--メッセージログ追加
-	self:AddMessageLog(localization_key)
-	
-	--音声停止
-	Audio.StopVoice()
+    --メッセージログ追加
+    self:AddMessageLog(localization_key)
+    
+    --音声停止
+    Audio.StopVoice()
 
-	--メッセージ送り音
-	Audio.PlaySystem( 3 )
+    --メッセージ送り音
+    Audio.PlaySystem( 3 )
 end";
             AdventureSystem.Instance()?.lua?.DoString(luaFunction);
         }
