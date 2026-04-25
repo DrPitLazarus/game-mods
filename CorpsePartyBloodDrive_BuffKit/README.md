@@ -5,11 +5,12 @@ My mod for Corpse Party: Blood Drive.
 A collection of small quality-of-life improvements and gameplay tweaks. Made for a friend who introduced me to the Corpse Party series.
 
 ## Download
-Visit the [release page](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.4.0). Current version is 0.4.0.
+Visit the [release page](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.5.0). Current version is 0.5.0.
 
 <details>
 <summary>Older Versions</summary>
 
+- [0.4.0](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.4.0)
 - [0.3.0](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.3.0)
 - [0.2.1](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.2.1)
 - [0.2.0](https://github.com/DrPitLazarus/game-mods/releases/tag/CorpsePartyBloodDrive_BuffKit@0.2.0)
@@ -29,7 +30,7 @@ Press F10 in-game to open the mod settings menu.
 - **ToggleUI** :star: [H by default]
   - Key bind to toggle most UI elements so you can look at CGs without obstruction. Works in-game and in the Gallery of Spirits.
 - **VSync** :star: [Disabled by default] 
-  - Use your display's refresh rate. Vanilla is enabled by default.
+  - Use your display's refresh rate. If enabled, GeneralFramerateLimit60 has no effect. Vanilla is enabled by default.
 - **FramerateLimit60** :star: [Enabled by default] 
   - Limit framerate to 60 FPS when VSync is disabled. Otherwise unlimited.
 - **HideRefreshRate** :star: [Enabled by default] 
@@ -51,8 +52,12 @@ Press F10 in-game to open the mod settings menu.
 ### Startup
 - **SkipBootLogos** :star: [Enabled by default] 
   - Skips startup logos when launching the game.
-- **StopTitleScreenLoop** :star: [Enabled by default] 
-  - Prevents the title screen (press any button) from looping back to the logos after 30 seconds.
+- **StopTitleScreenLoop** [Disabled by default] 
+  - Prevents the title screen (press any button) from looping back to the logos/opening movie after 30 seconds.
+- **PlayOpeningMovie** :star: [Enabled by default] 
+  - Plays the opening movie on startup. Plays opening_2 if player unlocked it (Chapter 7), otherwise opening (Chapter 0). Skip with MenuCancel (default ESC) or left mouse click. Both are replayable in the Gallery of Spirits on page 12 when unlocked. They forgot to finish implementing this lol.
+- **PreferOpening1** [Disabled by default] 
+  - If you have opening_2 (Chapter 7) unlocked, play opening (Chapter 0) instead. PlayOpeningMovie must be enabled.
 ### Text
 - **Speed** [1x by default]
   - Changes the speed that text is displayed. Disable TextVoiceSync to apply to voiced text. 
@@ -63,13 +68,13 @@ Press F10 in-game to open the mod settings menu.
 - **AlwaysRun** [Disabled by default] 
   - Run by default. Use run key to walk.
 - **InfiniteBandage** [Disabled by default]
-  - Always have a bandage in your inventory.
+  - Always have a bandage in your inventory. Runs when opening inventory menu or after using an item.
 - **InfiniteBatteryItem** [Disabled by default] 
-  - Always have a battery in your inventory. For those who want the thrilling and immersive experience of manually reloading your flashlight battery instead of the vanilla infinite battery... weirdo. This doesn't toggle the vanilla infinite battery option.
+  - Always have a battery in your inventory. Runs when opening inventory menu or after using an item. For those who want the thrilling and immersive experience of manually reloading your flashlight battery instead of the vanilla infinite battery... weirdo. This doesn't toggle the vanilla infinite battery option.
 - **InfiniteStamina** [Disabled by default] 
   - Player stamina will not decrease. Run, Rabbit, Run!
 - **InfiniteTalisman** [Disabled by default] 
-  - Always have a talisman in your inventory.
+  - Always have a talisman in your inventory. Runs while in-game and not in a menu.
 ### Tools
 - **OpenDataDirectory**
   - Opens game data directory. `%UserProfile%\AppData\LocalLow\XSEED\Corpse Party_ Blood Drive\`
@@ -79,6 +84,8 @@ Press F10 in-game to open the mod settings menu.
   - Opens the Unity output log file. `%UserProfile%\AppData\LocalLow\XSEED\Corpse Party_ Blood Drive\output_log.txt`
 - **OpenGitHubPage**
   - Opens the GitHub page for this mod in your browser.
+- **ClearTalismansFromInventory**
+  - Click to remove all talismans from your inventory. Make sure GameplayInfiniteTalisman is disabled.
 
 ## Notes
 
@@ -89,4 +96,4 @@ Other features that could be added, but currently do not have time to implement:
 - Ability to save the game at any time.
 - Chibi model and animation viewer would be pretty cool.
 
-![ModMenuScreenshots](https://github.com/user-attachments/assets/bf0ee022-264b-4c96-a557-76c9412054ce)
+![ModMenuScreenshots](https://github.com/user-attachments/assets/cad2ea48-68a5-4613-83ed-94b96eb510ef)

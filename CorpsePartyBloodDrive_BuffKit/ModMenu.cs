@@ -14,14 +14,19 @@ namespace BuffKit
         private static readonly Texture2D _colorTooltip = MakeBackgroundTexture(1, 1, new Color(0f, 0f, 0f, 1f));
         private static readonly float _windowHorizontalPadding = 20f;
         private static readonly float _buttonHorizontalPadding = 4f;
-        private static readonly int _resetButtonWidth = 50;
+        private static readonly int _resetButtonWidth = 60;
         private static readonly int _windowId = -5;
-        private static Rect _windowRect = new(20, 20, 500, 600);
+        private static readonly int _mainFontSize = 18;
+        private static Rect _windowRect = new(20, 20, 550, 700);
         private static bool _isVisible = false;
         private static int _toolbarInt = 0;
         private static Vector2 _scrollPosition = new(0, 0);
         private static GUIStyle _styleWindow;
         private static GUIStyle _styleSectionLabel;
+        private static GUIStyle _styleLabel;
+        private static GUIStyle _styleButton;
+        private static GUIStyle _styleToggle;
+        private static GUIStyle _styleTextInput;
         private static GUIStyle _styleToggleSkipLabel;
         private static ConfigEntry<KeyboardShortcut> _currentKeyboardShortcutToSet;
         private static IEnumerable<KeyCode> _keysToCheck;
@@ -83,12 +88,30 @@ namespace BuffKit
             {
                 // Set window background color (focused/unfocused).
                 onNormal = { background = _colorWindow },
-                normal = { background = _colorWindow }
+                normal = { background = _colorWindow },
+                fontSize = _mainFontSize
             };
             _styleSectionLabel ??= new GUIStyle(GUI.skin.label)
             {
                 fontStyle = FontStyle.Bold,
+                fontSize = 24,
                 margin = new RectOffset(0, 0, 10, 0)
+            };
+            _styleLabel ??= new GUIStyle(GUI.skin.label)
+            {
+                fontSize = _mainFontSize
+            };
+            _styleButton ??= new GUIStyle(GUI.skin.button)
+            {
+                fontSize = _mainFontSize
+            };
+            _styleToggle ??= new GUIStyle(GUI.skin.toggle)
+            {
+                fontSize = _mainFontSize
+            };
+            _styleTextInput ??= new GUIStyle(GUI.skin.textField)
+            {
+                fontSize = _mainFontSize
             };
         }
 
@@ -96,9 +119,9 @@ namespace BuffKit
         {
             // Main window toolbar.
             GUILayout.BeginHorizontal();
-            GUILayout.Label("By DrPitLazarus");
+            GUILayout.Label("By DrPitLazarus", _styleLabel);
             GUILayout.FlexibleSpace();
-            if (GUILayout.Button($"Close [{BuffKit.GeneralToggleModMenuUI.Value}]"))
+            if (GUILayout.Button($"Close [{BuffKit.GeneralToggleModMenuUI.Value}]", _styleButton))
             {
                 _isVisible = false;
             }
@@ -106,7 +129,7 @@ namespace BuffKit
             GUILayout.Space(10);
 
             // Tabs.
-            _toolbarInt = GUILayout.Toolbar(_toolbarInt, ["Settings", "Tools"]);
+            _toolbarInt = GUILayout.Toolbar(_toolbarInt, ["Settings", "Tools"], _styleButton);
 
             GUILayout.Space(10);
 
@@ -131,6 +154,8 @@ namespace BuffKit
                 DrawSectionLabel("Startup");
                 DrawSettingEntry(BuffKit.StartupSkipBootLogos);
                 DrawSettingEntry(BuffKit.StartupStopTitleScreenLoop);
+                DrawSettingEntry(BuffKit.StartupPlayOpeningMovie);
+                DrawSettingEntry(BuffKit.StartupPreferOpening1);
                 DrawSectionLabel("Text");
                 DrawSettingEntry(BuffKit.TextSpeed);
                 DrawSettingEntry(BuffKit.TextVoiceSync);
@@ -144,15 +169,16 @@ namespace BuffKit
             }
             else if (_toolbarInt == 1)
             {
-                DrawSettingButton("Open Game Data/Save Directory", () => BuffKit.ToolsOpenDataDirectory.Value = true);
-                DrawSettingButton("Open Game Install Directory", () => BuffKit.ToolsOpenGameDirectory.Value = true);
-                DrawSettingButton("Open Game output_log.txt", () => BuffKit.ToolsOpenOutputLog.Value = true);
-                DrawSettingButton("Open GitHub Page", () => BuffKit.ToolsOpenGitHubPage.Value = true);
+                DrawSettingButton(BuffKit.ToolsOpenDataDirectory);
+                DrawSettingButton(BuffKit.ToolsOpenGameDirectory);
+                DrawSettingButton(BuffKit.ToolsOpenOutputLog);
+                DrawSettingButton(BuffKit.ToolsOpenGitHubPage);
+                DrawSettingButton(BuffKit.ToolsClearTalismansFromInventory);
             }
             GUILayout.EndScrollView();
 
             // Footer.
-            GUILayout.Label("Hovering over this window will block input to the game. Mostly.");
+            GUILayout.Label("Hovering over this window will block input to the game. Mostly.", _styleLabel);
 
             DrawTooltip(_windowRect);
 
@@ -171,6 +197,7 @@ namespace BuffKit
                     wordWrap = true,
                     normal = { background = _colorTooltip },
                     alignment = TextAnchor.MiddleCenter,
+                    fontSize = _mainFontSize
                 };
 
                 var content = new GUIContent(tooltip);
@@ -202,16 +229,16 @@ namespace BuffKit
         {
             GUILayout.BeginHorizontal();
             var labelContent = new GUIContent(configEntry.Definition.Key.ToString(), configEntry.Description.Description);
-            GUILayout.Label(labelContent, GUILayout.Width(_columnWidth));
+            GUILayout.Label(labelContent, _styleLabel, GUILayout.Width(_columnWidth));
 
             switch (configEntry)
             {
                 case ConfigEntry<bool> boolEntry:
                     {
-                        boolEntry.Value = GUILayout.Toggle(boolEntry.Value, boolEntry.Value ? "Enabled" : "Disabled");
+                        boolEntry.Value = GUILayout.Toggle(boolEntry.Value, boolEntry.Value ? "Enabled" : "Disabled", _styleToggle);
                         GUILayout.FlexibleSpace();
                         var settingIsDefault = boolEntry.Value == (bool)boolEntry.DefaultValue;
-                        if (!settingIsDefault && GUILayout.Button("Reset", GUILayout.ExpandWidth(false), GUILayout.Width(_resetButtonWidth)))
+                        if (!settingIsDefault && GUILayout.Button("Reset", _styleButton, GUILayout.ExpandWidth(false), GUILayout.Width(_resetButtonWidth)))
                         {
                             boolEntry.Value = (bool)boolEntry.DefaultValue;
                         }
@@ -226,14 +253,14 @@ namespace BuffKit
                         var min = range.MinValue;
                         var max = range.MaxValue;
                         intEntry.Value = (int)GUILayout.HorizontalSlider(intEntry.Value, min, max, GUILayout.ExpandWidth(true));
-                        intEntry.Value = int.Parse(GUILayout.TextField(intEntry.Value.ToString(), GUILayout.Width(_resetButtonWidth)));
+                        intEntry.Value = int.Parse(GUILayout.TextField(intEntry.Value.ToString(), _styleTextInput, GUILayout.Width(_resetButtonWidth)));
                         //GUILayout.FlexibleSpace();
                         var settingIsDefault = intEntry.Value == (int)intEntry.DefaultValue;
                         if (settingIsDefault)
                         {
                             GUILayout.Space(_resetButtonWidth + _buttonHorizontalPadding);
                         }
-                        if (!settingIsDefault && GUILayout.Button("Reset", GUILayout.Width(_resetButtonWidth)))
+                        if (!settingIsDefault && GUILayout.Button("Reset", _styleButton, GUILayout.Width(_resetButtonWidth)))
                         {
                             intEntry.Value = (int)intEntry.DefaultValue;
                         }
@@ -245,7 +272,7 @@ namespace BuffKit
                         // State: Button pressed to set a new key bind.
                         if (ReferenceEquals(_currentKeyboardShortcutToSet, keybindEntry))
                         {
-                            GUILayout.Label("Recording, ESC to cancel...", GUILayout.ExpandWidth(true));
+                            GUILayout.Label("Recording, ESC to cancel...", _styleLabel, GUILayout.ExpandWidth(true));
                             // Clear GUI focus.
                             GUIUtility.keyboardControl = -1;
                             var input = UnityInput.Current;
@@ -265,16 +292,16 @@ namespace BuffKit
                                     break;
                                 }
                             }
-                            if (GUILayout.Button("Cancel", GUILayout.ExpandWidth(false), GUILayout.Width(_resetButtonWidth)))
+                            if (GUILayout.Button("Cancel", _styleButton, GUILayout.ExpandWidth(false), GUILayout.Width(_resetButtonWidth + 10)))
                                 _currentKeyboardShortcutToSet = null;
                         }
                         // State: Normal display.
                         else
                         {
-                            if (GUILayout.Button(keybindEntry.Value.ToString(), GUILayout.ExpandWidth(true)))
+                            if (GUILayout.Button(keybindEntry.Value.ToString(), _styleButton, GUILayout.ExpandWidth(true)))
                                 _currentKeyboardShortcutToSet = keybindEntry;
 
-                            if (GUILayout.Button("Clear", GUILayout.ExpandWidth(false), GUILayout.Width(_resetButtonWidth)))
+                            if (GUILayout.Button("Clear", _styleButton, GUILayout.ExpandWidth(false), GUILayout.Width(_resetButtonWidth)))
                             {
                                 keybindEntry.Value = KeyboardShortcut.Empty;
                                 _currentKeyboardShortcutToSet = null;
@@ -284,7 +311,7 @@ namespace BuffKit
                             {
                                 GUILayout.Space(_resetButtonWidth + _buttonHorizontalPadding);
                             }
-                            if (!settingIsDefault && GUILayout.Button("Reset", GUILayout.ExpandWidth(false), GUILayout.Width(_resetButtonWidth)))
+                            if (!settingIsDefault && GUILayout.Button("Reset", _styleButton, GUILayout.ExpandWidth(false), GUILayout.Width(_resetButtonWidth)))
                             {
                                 keybindEntry.Value = (KeyboardShortcut)keybindEntry.DefaultValue;
                             }
@@ -308,13 +335,13 @@ namespace BuffKit
                                 var field = option.GetType().GetField(option.ToString());
                                 label = field?.GetCustomAttributes(typeof(DescriptionAttribute), false).Cast<DescriptionAttribute>().FirstOrDefault()?.Description ?? option.ToString();
                                 label = optionIsCurrentValue ? $" > {label} <" : label.ToString();
-                                if (GUILayout.Button(label) && !optionIsCurrentValue)
+                                if (GUILayout.Button(label, _styleButton) && !optionIsCurrentValue)
                                 {
                                     configEntry.BoxedValue = option;
                                 }
                             }
                             var settingIsDefault = configEntry.BoxedValue.Equals(configEntry.DefaultValue);
-                            if (!settingIsDefault && GUILayout.Button("Reset"))
+                            if (!settingIsDefault && GUILayout.Button("Reset", _styleButton))
                             {
                                 configEntry.BoxedValue = configEntry.DefaultValue;
                             }
@@ -331,11 +358,12 @@ namespace BuffKit
             GUILayout.EndHorizontal();
         }
 
-        private void DrawSettingButton(string label, Action action)
+        private void DrawSettingButton(ConfigEntry<bool> configEntry)
         {
-            if (GUILayout.Button(label))
+            var labelContent = new GUIContent(configEntry.Definition.Key.ToString(), configEntry.Description.Description);
+            if (GUILayout.Button(labelContent, _styleButton))
             {
-                action?.Invoke();
+                configEntry.Value = true;
             }
         }
 

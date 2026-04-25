@@ -1,4 +1,5 @@
 ﻿using Adventure;
+using Assets.Scripts.UI;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -35,6 +36,8 @@ namespace BuffKit
         public static ConfigEntry<bool> GeneralHideRefreshRate;
         public static ConfigEntry<bool> StartupSkipBootLogos;
         public static ConfigEntry<bool> StartupStopTitleScreenLoop;
+        public static ConfigEntry<bool> StartupPlayOpeningMovie;
+        public static ConfigEntry<bool> StartupPreferOpening1;
         public static ConfigEntry<int> SaveMenuMaxSlots;
         public static ConfigEntry<bool> SaveMenuShowSlotNumbers;
         public static ConfigEntry<bool> SaveMenuShowTimeAgo;
@@ -53,6 +56,7 @@ namespace BuffKit
         public static ConfigEntry<bool> ToolsOpenGameDirectory;
         public static ConfigEntry<bool> ToolsOpenOutputLog;
         public static ConfigEntry<bool> ToolsOpenGitHubPage;
+        public static ConfigEntry<bool> ToolsClearTalismansFromInventory;
         public static GameObject GameObject;
         private static readonly string _defaultSettingIsVanilla = "Default is the vanilla setting.";
         private static readonly string _defaultSettingIsMod = "Default is the mod setting.";
@@ -83,7 +87,7 @@ namespace BuffKit
             GeneralToggleUI = Config.Bind("General", "ToggleUI", new KeyboardShortcut(KeyCode.H),
                 $"Key bind to toggle most UI elements so you can look at CGs without obstruction. Works in-game and in the Gallery of Spirits. \n\n{_defaultSettingIsMod}");
             GeneralVSync = Config.Bind("General", "VSync", false,
-                $"Use your display's refresh rate. Vanilla is enabled by default. \n\n{_defaultSettingIsMod}");
+                $"Use your display's refresh rate. If enabled, GeneralFramerateLimit60 has no effect. Vanilla is enabled by default. \n\n{_defaultSettingIsMod}");
             GeneralVSync.SettingChanged += (_, _) => QualitySettings.vSyncCount = GeneralVSync.Value ? 1 : 0;
             GeneralFramerateLimit60 = Config.Bind("General", "FramerateLimit60", true,
                 $"Limit framerate to 60 FPS when VSync is disabled. Otherwise unlimited. \n\n{_defaultSettingIsMod}");
@@ -91,9 +95,13 @@ namespace BuffKit
             GeneralHideRefreshRate = Config.Bind("General", "HideRefreshRate", true,
                 $"Removes the refresh rate from the resolution text as it is not used in the game and just takes up space. Example: 1920x1080@360 becomes 1920x1080. \n\n{_defaultSettingIsMod}");
             StartupSkipBootLogos = Config.Bind("Startup", "SkipBootLogos", true,
-                $"Skips the boot logos and go directly to the title screen. \n\n{_defaultSettingIsMod}");
-            StartupStopTitleScreenLoop = Config.Bind("Startup", "StopTitleScreenLoop", true,
-                $"Prevents the title screen (press any button) from looping back to the logos after 30 seconds. \n\n{_defaultSettingIsMod}");
+                $"Skips startup logos when launching the game. \n\n{_defaultSettingIsMod}");
+            StartupStopTitleScreenLoop = Config.Bind("Startup", "StopTitleScreenLoop", false,
+                $"Prevents the title screen (press any button) from looping back to the logos/opening movie after 30 seconds. \n\n{_defaultSettingIsVanilla}");
+            StartupPlayOpeningMovie = Config.Bind("Startup", "PlayOpeningMovie", true,
+                $"Plays the opening movie on startup. Plays opening_2 if player unlocked it (Chapter 7), otherwise opening (Chapter 0). Skip with MenuCancel (default ESC) or left mouse click. Both are replayable in the Gallery of Spirits on page 12 when unlocked. They forgot to finish implementing this lol. \n\n{_defaultSettingIsMod}");
+            StartupPreferOpening1 = Config.Bind("Startup", "PreferOpening1", false,
+                $"If you have opening_2 (Chapter 7) unlocked, play opening (Chapter 0) instead. StartupPlayOpeningMovie must be enabled. \n\n{_defaultSettingIsVanilla}");
             SaveMenuMaxSlots = Config.Bind("SaveMenu", "MaxSlots", 50, new ConfigDescription(
                 $"Number of save slots to display. Default is 50. Vanilla is 20. Recommend not going over 100 saves, but I won't stop you...Increases time to load the save menu." +
                 $"\n\nFewer save slots won't delete data and only displays slots up to it." +
@@ -120,17 +128,17 @@ namespace BuffKit
             GameplayAlwaysRun = Config.Bind("Gameplay", "AlwaysRun", false,
                 $"Run by default. Use run key to walk. \n\n{_defaultSettingIsVanilla}");
             GameplayInfiniteBandage = Config.Bind("Gameplay", "InfiniteBandage", false,
-                $"Always have a bandage in your inventory. \n\n{_defaultSettingIsVanilla}");
+                $"Always have a bandage in your inventory. Runs when opening inventory menu or after using an item. \n\n{_defaultSettingIsVanilla}");
             GameplayInfiniteBatteryItem = Config.Bind("Gameplay", "InfiniteBatteryItem", false,
-                $"Always have a battery in your inventory. For those who want the thrilling and immersive experience of manually reloading your flashlight battery instead of the vanilla infinite battery... weirdo. This doesn't toggle the vanilla infinite battery option. \n\n{_defaultSettingIsVanilla}");
+                $"Always have a battery in your inventory. Runs when opening inventory menu or after using an item. For those who want the thrilling and immersive experience of manually reloading your flashlight battery instead of the vanilla infinite battery... weirdo. This doesn't toggle the vanilla infinite battery option. \n\n{_defaultSettingIsVanilla}");
             GameplayInfiniteStamina = Config.Bind("Gameplay", "InfiniteStamina", false,
                 $"Player stamina will not decrease. Run, Rabbit, Run! \n\n{_defaultSettingIsVanilla}");
             GameplayInfiniteTalisman = Config.Bind("Gameplay", "InfiniteTalisman", false,
-                $"Always have a talisman in your inventory. \n\n{_defaultSettingIsVanilla}");
+                $"Always have a talisman in your inventory. Runs while in-game and not in a menu. \n\n{_defaultSettingIsVanilla}");
             //GameplayMenuAnytime = Config.Bind("Gameplay", "MenuAnytime", true,
             //    $"[Experimental] Allows opening the menu in dialogue and cutscenes. Does not work... \n\n{_defaultSettingIsMod}");
             ToolsOpenDataDirectory = Config.Bind("Tools", "OpenDataDirectory", false,
-                "Click to open game data directory.");
+                "Click to open game data directory. \n" + @"%UserProfile%\AppData\LocalLow\XSEED\Corpse Party_ Blood Drive\");
             ToolsOpenDataDirectory.SettingChanged += (_, _) =>
             {
                 if (!ToolsOpenDataDirectory.Value) return; // Only act when set to true.
@@ -146,7 +154,7 @@ namespace BuffKit
                 Application.OpenURL(Path.GetDirectoryName(Application.dataPath));
             };
             ToolsOpenOutputLog = Config.Bind("Tools", "OpenOutputLog", false,
-                "Click to open the Unity output_log.txt.");
+                "Click to open the Unity output_log.txt. \n" + @"%UserProfile%\AppData\LocalLow\XSEED\Corpse Party_ Blood Drive\output_log.txt");
             ToolsOpenOutputLog.SettingChanged += (_, _) =>
             {
                 if (!ToolsOpenOutputLog.Value) return; // Only act when set to true.
@@ -154,12 +162,20 @@ namespace BuffKit
                 Application.OpenURL(Path.Combine(Application.persistentDataPath, "output_log.txt"));
             };
             ToolsOpenGitHubPage = Config.Bind("Tools", "OpenGitHubPage", false,
-                "Click to open the GitHub page for this mod in your browser.");
+                $"Click to open the GitHub page for this mod in your browser. \n{_gitHubUrl}");
             ToolsOpenGitHubPage.SettingChanged += (_, _) =>
             {
                 if (!ToolsOpenGitHubPage.Value) return; // Only act when set to true.
                 ToolsOpenGitHubPage.Value = false; // Reset to false.
                 Application.OpenURL(_gitHubUrl);
+            };
+            ToolsClearTalismansFromInventory = Config.Bind("Tools", "ClearTalismansFromInventory", false,
+                "Click to remove all talismans from your inventory. Make sure GameplayInfiniteTalisman is disabled.");
+            ToolsClearTalismansFromInventory.SettingChanged += (_, _) =>
+            {
+                if (!ToolsClearTalismansFromInventory.Value) return; // Only act when set to true.
+                ToolsClearTalismansFromInventory.Value = false; // Reset to false.
+                GameplayInventory_Patch.ClearTalismansFromInventory();
             };
         }
 
@@ -250,21 +266,19 @@ namespace BuffKit
     internal class Startup_Patch
     {
         /// <summary>
-        /// On the logo scene, if enabled, skip it and go straight to the title screen (press any button).
+        /// Since the original LogoControl.Start() method is a coroutine, we need to replace it with out own. See Start_Patch().
         /// </summary>
         [HarmonyPatch(typeof(LogoControl), nameof(LogoControl.Start))]
         [HarmonyPrefix]
         private static bool Start(LogoControl __instance)
         {
-            if (!BuffKit.StartupSkipBootLogos.Value) return true; // Don't skip, run original method.
-            BuffKit.Log("Skipping boot logos...");
             // Run replacement coroutine method.
             __instance.StartCoroutine(Start_Patch(__instance));
             return false; // Skip original method.
         }
 
         /// <summary>
-        /// Replacement coroutine method. See above Start() method.
+        /// Replacement coroutine method for LogoControl.Start(). See above Start() method.
         /// </summary>
         private static IEnumerator Start_Patch(LogoControl __instance)
         {
@@ -274,8 +288,96 @@ namespace BuffKit
                 __instance.logoGraphics[i].gameObject.SetActive(false);
                 __instance.logoGraphics[i].color = Color.white;
             }
-            yield return new WaitForSeconds(0.001f); // Need to wait a moment or it gets stuck here.
-            Common.Instance().LoadLevel("title", LoadSceneMode.Single);
+            yield return new WaitForSeconds(0.001f); // Need to wait a moment or it gets stuck here. 0f does not work.
+            __instance.StartCoroutine(FadeLogo_Patch(__instance));
+        }
+
+        /// <summary>
+        /// Replacement coroutine for handling boot logos and playing opening movie.
+        /// </summary>
+        private static IEnumerator FadeLogo_Patch(LogoControl __instance)
+        {
+            if (BuffKit.StartupSkipBootLogos.Value)
+            {
+                BuffKit.Log("Skipping boot logos...");
+            }
+            else
+            {
+                // Original method:
+                __instance.d = 0f;
+                __instance.tmpDelay = __instance.delay;
+                __instance.isOnCycle = false;
+                if (__instance.currentLogo != null)
+                {
+                    __instance.currentLogo.gameObject.SetActive(false);
+                }
+                __instance.currentLogo = __instance.logoGraphics[__instance.index];
+                __instance.currentLogo.gameObject.SetActive(true);
+                while (__instance.d < 1f)
+                {
+                    __instance.time += Time.deltaTime;
+                    __instance.d = __instance.time / __instance.duration;
+                    __instance.color = __instance.currentLogo.color;
+                    __instance.color.r = (__instance.color.g = (__instance.color.b = __instance.d));
+                    __instance.currentLogo.color = __instance.color;
+                    yield return new WaitForSeconds(0f);
+                }
+                while (__instance.tmpDelay > 0f)
+                {
+                    if (__instance.isOnCycle)
+                    {
+                        __instance.tmpDelay = 0f;
+                    }
+                    else
+                    {
+                        __instance.tmpDelay -= Time.deltaTime;
+                    }
+                    yield return 0;
+                }
+                while (__instance.d > 0f)
+                {
+                    __instance.time -= Time.deltaTime;
+                    __instance.d = __instance.time / __instance.duration;
+                    __instance.color = __instance.currentLogo.color;
+                    __instance.color.r = (__instance.color.g = (__instance.color.b = __instance.d));
+                    __instance.currentLogo.color = __instance.color;
+                    yield return new WaitForSeconds(0f);
+                }
+            }
+            // Original method:
+            __instance.index++;
+            if (__instance.index >= __instance.logoGraphics.Count)
+            {
+                // MODIFIED SECTION. Original didn't complete the implementation of playing the opening movie, so I finished it.
+                // Plays opening_2 if player unlocked it (Chapter 7), otherwise opening (Chapter 0).
+                // Both are replayable in the Gallery of Spirits on page 12 when unlocked.
+                var movieToPlay = "";
+                if (__instance.IsMovieOpen("opening_2") && !BuffKit.StartupPreferOpening1.Value)
+                {
+                    movieToPlay = "opening_2";
+                }
+                else
+                {
+                    movieToPlay = "opening";
+                }
+                if (BuffKit.StartupPlayOpeningMovie.Value)
+                {
+                    BuffKit.Log($"Playing {movieToPlay}...");
+                    PlayMovieMain.Setup(movieToPlay, "title", true, false);
+                    Common.Instance().LoadLevel("PlayMovie", LoadSceneMode.Single);
+                }
+                else
+                {
+                    Common.Instance().LoadLevel("title", LoadSceneMode.Single);
+                }
+                // END MODIFIED SECTION.
+            }
+            else
+            {
+                yield return new WaitForSeconds(0.25f);
+                __instance.StartCoroutine(FadeLogo_Patch(__instance));
+            }
+            yield break;
         }
 
         /// <summary>
@@ -283,7 +385,7 @@ namespace BuffKit
         /// </summary>
         [HarmonyPatch(typeof(StatControl), nameof(StatControl.Update))]
         [HarmonyPrefix]
-        private static bool Update(StatControl __instance)
+        private static bool StatControl_Update(StatControl __instance)
         {
             if (!BuffKit.StartupStopTitleScreenLoop.Value) return true; // Don't modify, run original method.
             // Original method:
@@ -710,12 +812,14 @@ namespace BuffKit
     }
 
 
+    [HarmonyPatch]
     internal class GameplayInventory_Patch : MonoBehaviour
     {
         private static readonly float _checkInterval = 1f;
         private static readonly string _bandageItemId = "item04";
         private static readonly string _batteryItemId = "item06";
         private static readonly string _talismanItemId = "item11";
+        private static InventoryMenu _inventoryMenuInstance;
 
         private void Start()
         {
@@ -724,7 +828,7 @@ namespace BuffKit
         }
 
         /// <summary>
-        /// Main coroutine to check inventory and add items if they are missing and the corresponding config option is enabled.
+        /// Main coroutine to check inventory and add talismans in game if missing and enabled.
         /// </summary>
         private IEnumerator CheckInventory()
         {
@@ -734,22 +838,6 @@ namespace BuffKit
                 var gameData = Common.Instance().GameData;
                 if (gameData == null || !BuffKit.MapSystemIsActive) continue;
 
-                if (BuffKit.GameplayInfiniteBandage.Value)
-                {
-                    if (!gameData.items.Contains(_bandageItemId))
-                    {
-                        BuffKit.Log("InfiniteBandage: not found, adding one...");
-                        gameData.AddItem(_bandageItemId);
-                    }
-                }
-                if (BuffKit.GameplayInfiniteBatteryItem.Value)
-                {
-                    if (!gameData.items.Contains(_batteryItemId))
-                    {
-                        BuffKit.Log("InfiniteBatteryItem: not found, adding one...");
-                        gameData.AddItem(_batteryItemId);
-                    }
-                }
                 if (BuffKit.GameplayInfiniteTalisman.Value)
                 {
                     if (!gameData.items.Contains(_talismanItemId))
@@ -760,7 +848,100 @@ namespace BuffKit
                 }
             }
         }
+
+        /// <summary>
+        /// Cache reference to the inventory menu instance when it starts to allow refreshing it later after modifying inventory items.
+        /// </summary>
+        [HarmonyPatch(typeof(InventoryMenu), nameof(InventoryMenu.Start))]
+        [HarmonyPostfix]
+        private static void InventoryMenu_Start(InventoryMenu __instance)
+        {
+            _inventoryMenuInstance = __instance;
+        }
+
+        /// <summary>
+        /// After using an item, checks and adds inventory items if missing and enabled. Refreshes the inventory list.
+        /// </summary>
+        [HarmonyPatch(typeof(InventoryMenu), nameof(InventoryMenu.ItemUseDone))]
+        [HarmonyPostfix]
+        private static void ItemUseDone(InventoryMenu __instance)
+        {
+            CheckInventoryScreen();
+            __instance.OnDisable();
+            __instance.OnEnable();
+        }
+
+        /// <summary>
+        /// When opening the inventory menu, check and add bandage and battery items if missing and enabled.
+        /// </summary>
+        [HarmonyPatch(typeof(InventoryMenu), nameof(InventoryMenu.OnEnable))]
+        [HarmonyPostfix]
+        private static void OnEnable(InventoryMenu __instance)
+        {
+            CheckInventoryScreen();
+        }
+
+        /// <summary>
+        /// Checks and adds bandage and battery items if missing and enabled.
+        /// </summary>
+        private static void CheckInventoryScreen()
+        {
+            var gameData = Common.Instance().GameData;
+            if (gameData == null) return;
+
+            if (BuffKit.GameplayInfiniteBandage.Value)
+            {
+                if (!gameData.items.Contains(_bandageItemId))
+                {
+                    BuffKit.Log("InfiniteBandage: not found, adding one...");
+                    gameData.AddItem(_bandageItemId);
+                }
+            }
+            if (BuffKit.GameplayInfiniteBatteryItem.Value)
+            {
+                if (!gameData.items.Contains(_batteryItemId))
+                {
+                    BuffKit.Log("InfiniteBatteryItem: not found, adding one...");
+                    gameData.AddItem(_batteryItemId);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Clears all talismans from the player's inventory. Refreshes the inventory menu if it's open to reflect the changes.
+        /// </summary>
+        /// <returns>True if successful/already cleared, false if GameData is null.</returns>
+        public static bool ClearTalismansFromInventory()
+        {
+            var gameData = Common.Instance().GameData;
+            if (gameData == null)
+            {
+                BuffKit.Log("ClearTalismansFromInventory(): ERROR: GameData is null!");
+                return false;
+            }
+            var talismanCount = gameData.items.Count(v => v == _talismanItemId);
+            if (talismanCount <= 0)
+            {
+                BuffKit.Log("ClearTalismansFromInventory(): Nothing to clear.");
+                return true;
+            }
+            BuffKit.Log($"ClearTalismansFromInventory(): Clearing {talismanCount} talisman{(talismanCount > 1 ? "s" : "")} from inventory...");
+            while (talismanCount > 0)
+            {
+                gameData.RemoveItem(_talismanItemId);
+                talismanCount--;
+            }
+            // Refresh inventory menu if it's open to reflect the changes.
+            if (_inventoryMenuInstance != null)
+            {
+                _inventoryMenuInstance.OnDisable();
+                _inventoryMenuInstance.OnEnable();
+            }
+            BuffKit.Log("ClearTalismansFromInventory(): Done.");
+            return true;
+        }
     }
+
 
 
     /// <summary>
